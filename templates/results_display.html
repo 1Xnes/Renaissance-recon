@@ -1,0 +1,15 @@
+
+
+&lt;!DOCTYPE html>
+&lt;html lang="tr">
+&lt;head>
+&lt;meta charset="UTF-8">
+&lt;title>Tarama Sonuçları&lt;/title>
+&lt;link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+&lt;/head>
+&lt;body>
+&lt;h1>Tarama Sonuçları&lt;/h1>
+&lt;p>Sonuçlar burada gösterilecek.&lt;/p>
+&lt;a href="{{ url_for('index') if 'index' in globals() else '/' }}">Ana Sayfaya Dön&lt;/a>
+&lt;/body>
+&lt;/html>

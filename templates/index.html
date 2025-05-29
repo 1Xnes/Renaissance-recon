@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSINT & Recon Aracı</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>OSINT & Recon Aracı</h1>
+
+        <form method="POST" action="{{ url_for('index') }}">
+            <div class="form-group">
+                <label for="target_domain">Hedef Domain/URL (örn: example.com veya http://example.com):</label>
+                <input type="text" id="target_domain" name="target_domain" value="{{ target_domain if target_domain else '' }}" required>
+            </div>
+            <button type="submit" class="button">Tarama Başlat</button>
+        </form>
+
+        {% if error %}
+            <p class="message error-message">{{ error }}</p>
+        {% endif %}
+
+        {% if message %}
+            <p class="message success-message">{{ message }}</p>
+        {% endif %}
+
+        {% if scan_initiated and target_domain %}
+            <div class="results-section">
+                <h2>{{ target_domain }} için Tarama Sonuçları</h2>
+
+                {% if scan_results.ffuf is not none %}
+                <div class="tool-results">
+                    <h3>Dizin/Dosya Taraması (ffuf)</h3>
+                    {% if scan_results.ffuf %}
+                        <ul class="results-list">
+                            {% for item in scan_results.ffuf %}
+                                <li>
+                                    <a href="{{ item.url }}" target="_blank">{{ item.url }}</a> 
+                                    [Status: {{ item.status }}, Length: {{ item.length }}]
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% elif not error %} {# Hata yoksa ama sonuç da yoksa ffuf'tan gelen mesajı dikkate al #}
+                        <p>Belirtilen wordlist ile eşleşen bir yol bulunamadı.</p>
+                    {% endif %}
+                </div>
+                {% elif error and "ffuf" in error.lower() %}
+                     {% endif %}
+
+
+                {% if scan_results.sublist3r %}
+                <div class="tool-results">
+                    <h3>Subdomain Keşfi (Sublist3r)</h3>
+                    {# ... Sublist3r sonuçları için döngü ... #}
+                </div>
+                {% endif %}
+
+                {% if scan_results.subdomainizer %}
+                <div class="tool-results">
+                    <h3>Secret/Ek Subdomain Keşfi (SubDomainizer)</h3>
+                    {# ... SubDomainizer sonuçları için döngü ... #}
+                </div>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Xnes</p>
+    </footer>
+
+    <style>
+        /* Hızlıca eklenecek stiller, normalde static/css/style.css içinde olmalı */
+        .results-section { margin-top: 30px; padding: 20px; background-color: #f9f9f9; border-radius: 5px; }
+        .tool-results { margin-bottom: 20px; }
+        .tool-results h3 { border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 10px; color: #3498db; }
+        .results-list { list-style-type: none; padding-left: 0; }
+        .results-list li { background-color: #fff; border: 1px solid #ddd; padding: 8px 12px; margin-bottom: 5px; border-radius: 4px; font-size: 0.95em; }
+        .results-list li a { text-decoration: none; color: #2980b9; }
+        .results-list li a:hover { text-decoration: underline; }
+    </style>
+</body>
+</html>
