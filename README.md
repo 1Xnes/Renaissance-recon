@@ -33,6 +33,7 @@ Ardından web tarayıcınızda http://127.0.0.1:5000 adresine gidin.
 - https://nsonaniya2010.github.io/neeraj.github.io/
 - google.com
 - https://www.facebook.com
+- http://ffuf.io.fi/
 
 (CLI kullanımı detayları eklenecek.)
 
