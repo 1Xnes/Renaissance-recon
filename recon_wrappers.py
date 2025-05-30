@@ -57,6 +57,11 @@ def run_sublist3r(target_domain, output_file):
     # Sublist3r -d domain_adı şeklinde çalışır. URL değil.
     # Python'ı tamponsuz modda çalıştırmak için '-u' parametresini ekliyoruz.
     # Bu, stdout'un boru üzerinden daha güvenilir bir şekilde yakalanmasına yardımcı olabilir.
+    # https:// veya http:// ile başlamamalı, sadece domain adı olmalı, ve baştaki www. da dahil edilmemeli kırpılmalı.
+    if target_domain.startswith(('http://', 'https://')):
+        target_domain = target_domain.split('//')[-1]
+    if target_domain.startswith('www.'):
+        target_domain = target_domain[4:]
     command = [PYTHON_CMD, '-u', SUBLIST3R_PATH, '-d', target_domain]
     return run_command(command, output_file)
 
