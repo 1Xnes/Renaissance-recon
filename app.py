@@ -1,221 +1,290 @@
-from flask import Flask, render_template, request, redirect, url_for
 import os
 import subprocess
-import re 
-from recon_wrappers import run_sublist3r, run_subdomainizer, run_ffuf
+import json
+from flask import Flask, render_template, request, redirect, url_for
+from urllib.parse import quote_plus, unquote_plus, urlparse
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'output'
-if not os.path.exists(app.config['UPLOAD_FOLDER']):
-    os.makedirs(app.config['UPLOAD_FOLDER'])
 
-BASE_DIR_APP = os.path.dirname(os.path.abspath(__file__))
-WORDLISTS_DIR = os.path.join(BASE_DIR_APP, 'wordlists')
+# Ensure output directory exists
+# Create 'output' directory if it doesn't exist to store scan results
+if not os.path.exists('output'):
+    os.makedirs('output')
+
+# Ensure tools directory exists
+# Create 'tools' directory if it doesn't exist (though tools are expected to be pre-populated)
+if not os.path.exists('tools'):
+    os.makedirs('tools')
+
+# Ensure wordlists directory exists
+# Create 'wordlists' directory if it doesn't exist (wordlists should be present)
+if not os.path.exists('wordlists'):
+    os.makedirs('wordlists')
 
 
-def sanitize_domain_for_filename(domain_url):
-    name = re.sub(r'^https?://', '', domain_url)
-    name = re.sub(r'[/:*?"<>|]', '_', name)
-    name = re.sub(r'_+', '_', name)
-    return name
+def get_tool_path(tool_name_with_subdir):
+    # Helper function to get the absolute path to a tool's executable script.
+    # tool_name_with_subdir should be like 'Sublist3r/sublist3r' or 'SubDomainizer/SubDomainizer'
+    # It assumes the script has the same name as the last part of tool_name_with_subdir and a .py extension.
+    script_name = os.path.basename(tool_name_with_subdir)
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tools', tool_name_with_subdir + '.py')
 
-def parse_subdomainizer_output(output_content):
-    subdomains = []
-    cloud_urls = []
-    secrets = []
+def get_wordlist_path(wordlist_name):
+    # Helper function to get the absolute path to a wordlist.
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wordlists', wordlist_name)
+
+def run_command(command, output_file_base_for_logs, tool_name):
+    # Runs a command and captures its stdout and stderr, saving them to files.
+    # command: The command to run (list of strings).
+    # output_file_base_for_logs: The base name for stdout/stderr log files (e.g., "google.com_").
+    # tool_name: The name of the tool being run (e.g., "sublist3r", "ffuf").
+
+    stdout_path = f"output/{output_file_base_for_logs}{tool_name}_stdout.txt"
+    stderr_path = f"output/{output_file_base_for_logs}{tool_name}_stderr.txt"
+    
+    # For ffuf, the JSON output path is determined by its own '-o' argument in the command.
+    # This function primarily handles stdout/stderr logging.
+
     try:
-        subdomain_match = re.search(r"Got some subdomains\.\.\.\s*Total Subdomains: \d+\s*(.*?)\s*____", output_content, re.DOTALL)
-        if subdomain_match:
-            subdomains = [line.strip() for line in subdomain_match.group(1).strip().split('\n') if line.strip()]
+        # Execute the command
+        # text=True ensures stdout/stderr are strings
+        # cwd sets the current working directory for the subprocess, useful if tools expect to be run from their own directory
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8', errors='replace', cwd=os.path.dirname(os.path.abspath(__file__)))
+        stdout, stderr = process.communicate(timeout=300) # Timeout after 5 minutes
 
-        cloud_url_match = re.search(r"Some cloud services urls are found\.\.\.\s*Total Cloud URLs: \d+\s*(.*?)\s*____", output_content, re.DOTALL)
-        if cloud_url_match:
-            cloud_urls = [line.strip() for line in cloud_url_match.group(1).strip().split('\n') if line.strip()]
+        # Write stdout to its log file
+        with open(stdout_path, 'w', encoding='utf-8') as f_out:
+            f_out.write(stdout)
+        # Write stderr to its log file
+        with open(stderr_path, 'w', encoding='utf-8') as f_err:
+            f_err.write(stderr)
 
-        secret_match = re.search(r"Found some secrets\(might be false positive\)\.\.\.\s*Total Possible Secrets: \d+\s*(.*?)\s*____", output_content, re.DOTALL)
-        if secret_match:
-            secrets = [line.strip() for line in secret_match.group(1).strip().split('\n') if line.strip()]
+        # ffuf writes its own JSON file as specified in its command arguments.
+        # This function doesn't need to return the JSON path as it's constructed before calling run_command.
+
+    except subprocess.TimeoutExpired:
+        # Handle command timeout
+        timeout_message = "Komut zaman aşımına uğradı (300 saniye)."
+        with open(stdout_path, 'w', encoding='utf-8') as f_out:
+            f_out.write(timeout_message)
+        with open(stderr_path, 'w', encoding='utf-8') as f_err:
+            f_err.write(timeout_message)
     except Exception as e:
-        print(f"SubDomainizer çıktısı ayrıştırılırken hata: {e}")
-    return subdomains, cloud_urls, secrets
+        # Handle other exceptions during command execution
+        error_message = f"Komut çalıştırılırken bir hata oluştu: {str(e)}"
+        with open(stdout_path, 'w', encoding='utf-8') as f_out:
+            f_out.write("") # No stdout if command failed early
+        with open(stderr_path, 'w', encoding='utf-8') as f_err:
+            f_err.write(error_message)
+
+
+def sanitize_filename(name):
+    # Replaces characters that are problematic in filenames.
+    # This is crucial for creating safe filenames from user input (targets/URLs).
+    name = name.replace("http://", "")
+    name = name.replace("https://", "")
+    name = name.replace("/", "_").replace(":", "_").replace("#", "_").replace("?", "_").replace("&", "_")
+    # Remove or replace other potentially problematic characters as needed
+    name = "".join(c for c in name if c.isalnum() or c in ('_', '-')).strip()
+    return name
 
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    # Main page route: handles form submission for starting a scan.
     if request.method == 'POST':
-        target_domain_input = request.form.get('domain')
-        run_sublist3r_flag = request.form.get('run_sublist3r')
-        run_subdomainizer_flag = request.form.get('run_subdomainizer')
-        run_ffuf_flag = request.form.get('run_ffuf')
-        user_wordlist_path = request.form.get('wordlist')
-
-        if not target_domain_input:
-            return render_template('index.html', error="Hedef domain boş olamaz!")
-
-        sanitized_domain_name = sanitize_domain_for_filename(target_domain_input)
-
-        # Çıktı ve stderr dosyası isimleri
-        sublist3r_output_file = os.path.join(app.config['UPLOAD_FOLDER'], f"{sanitized_domain_name}_sublist3r_stdout.txt")
-        sublist3r_stderr_file = os.path.join(app.config['UPLOAD_FOLDER'], f"{sanitized_domain_name}_sublist3r_stderr.txt")
+        # Use request.form.get('target') to avoid KeyError if 'target' is not in the form
+        target_url = request.form.get('target') 
+        if not target_url:
+            # Handle empty target or missing target field
+            return render_template('index.html', error="Hedef URL boş olamaz veya formda 'target' alanı eksik.")
         
-        subdomainizer_output_file = os.path.join(app.config['UPLOAD_FOLDER'], f"{sanitized_domain_name}_subdomainizer_stdout.txt")
-        subdomainizer_stderr_file = os.path.join(app.config['UPLOAD_FOLDER'], f"{sanitized_domain_name}_subdomainizer_stderr.txt")
-        
-        # FFUF kendi JSON çıktısını yönetir, biz sadece konsol stdout/stderr'ini yakalayabiliriz (opsiyonel)
-        ffuf_json_output_file = os.path.join(app.config['UPLOAD_FOLDER'], f"{sanitized_domain_name}_ffuf.json")
-        ffuf_console_stderr_file = os.path.join(app.config['UPLOAD_FOLDER'], f"{sanitized_domain_name}_ffuf_stderr.txt")
-
-
-        results_flags = {
-            'sublist3r_run': False,
-            'subdomainizer_run': False,
-            'ffuf_run': False
-        }
-        
-        current_ffuf_wordlist = None
-        if run_ffuf_flag:
-            if user_wordlist_path and user_wordlist_path.strip():
-                if not os.path.isabs(user_wordlist_path):
-                    current_ffuf_wordlist = os.path.join(BASE_DIR_APP, user_wordlist_path)
-                else:
-                    current_ffuf_wordlist = user_wordlist_path
-                if not os.path.exists(current_ffuf_wordlist):
-                    return render_template('index.html', error=f"Belirtilen FFUF kelime listesi bulunamadı: {current_ffuf_wordlist}")
-            else:
-                current_ffuf_wordlist = os.path.join(WORDLISTS_DIR, 'common_small.txt')
-                if not os.path.exists(current_ffuf_wordlist):
-                     return render_template('index.html', error=f"Varsayılan FFUF kelime listesi bulunamadı: {current_ffuf_wordlist}")
-
-        if run_sublist3r_flag:
-            print(f"Sublist3r çalıştırılıyor: {target_domain_input}")
-            clean_target_for_sublist3r = target_domain_input.replace("https://", "").replace("http://", "").split('/')[0]
-            stdout, stderr = run_sublist3r(clean_target_for_sublist3r, sublist3r_output_file) # stdout dosyaya yazılır
-            with open(sublist3r_stderr_file, 'w', encoding='utf-8') as f_err:
-                f_err.write(stderr if stderr else "")
-            results_flags['sublist3r_run'] = True
-            print(f"Sublist3r tamamlandı. Stdout: {sublist3r_output_file}, Stderr: {sublist3r_stderr_file}")
-
-        if run_subdomainizer_flag:
-            print(f"SubDomainizer çalıştırılıyor: {target_domain_input}")
-            target_url_for_subdomainizer = target_domain_input
-            if not target_domain_input.startswith(('http://', 'https://')):
-                target_url_for_subdomainizer = f"https://{target_domain_input}"
-            stdout, stderr = run_subdomainizer(target_url_for_subdomainizer, subdomainizer_output_file) # stdout dosyaya yazılır
-            with open(subdomainizer_stderr_file, 'w', encoding='utf-8') as f_err:
-                f_err.write(stderr if stderr else "")
-            results_flags['subdomainizer_run'] = True
-            print(f"SubDomainizer tamamlandı. Stdout: {subdomainizer_output_file}, Stderr: {subdomainizer_stderr_file}")
-
-        if run_ffuf_flag and current_ffuf_wordlist:
-            print(f"FFUF çalıştırılıyor: {target_domain_input} kelime listesi: {current_ffuf_wordlist}")
-            target_url_for_ffuf = target_domain_input
-            if not target_domain_input.startswith(('http://', 'https://')):
-                 target_url_for_ffuf = f"https://{target_domain_input}"
-            if not target_url_for_ffuf.endswith('/'):
-                target_url_for_ffuf += '/'
-            
-            # FFUF kendi JSON çıktısını ffuf_json_output_file'a yazar.
-            # run_ffuf, FFUF'un konsol stdout ve stderr'ini döndürür.
-            ffuf_console_stdout, ffuf_console_stderr = run_ffuf(f"{target_url_for_ffuf}FUZZ", current_ffuf_wordlist, ffuf_json_output_file)
-            with open(ffuf_console_stderr_file, 'w', encoding='utf-8') as f_err:
-                 f_err.write(ffuf_console_stderr if ffuf_console_stderr else "")
-            # ffuf_console_stdout'u da isterseniz bir dosyaya yazabilirsiniz.
-            results_flags['ffuf_run'] = True
-            print(f"FFUF tamamlandı. JSON Çıktı: {ffuf_json_output_file}, Konsol Stderr: {ffuf_console_stderr_file}")
-        
-        return redirect(url_for('show_results', 
-                                display_domain_key=sanitized_domain_name, 
-                                original_target=target_domain_input,
-                                sublist3r_run=results_flags['sublist3r_run'],
-                                subdomainizer_run=results_flags['subdomainizer_run'],
-                                ffuf_run=results_flags['ffuf_run']
-                                ))
-
+        # URL encode the target to make it safe for use in a URL path
+        safe_target_for_url = quote_plus(target_url)
+        return redirect(url_for('run_scans', target=safe_target_for_url))
     return render_template('index.html')
 
-@app.route('/results/<display_domain_key>')
-def show_results(display_domain_key):
-    original_target = request.args.get('original_target', display_domain_key)
-    sublist3r_run = request.args.get('sublist3r_run', 'False') == 'True'
-    subdomainizer_run = request.args.get('subdomainizer_run', 'False') == 'True'
-    ffuf_run = request.args.get('ffuf_run', 'False') == 'True'
+@app.route('/scan/<target>')
+def run_scans(target):
+    # Scan execution route: decodes target, prepares commands, and runs them.
+    decoded_target_url = unquote_plus(target) # The full URL as provided by the user
 
-    # Stdout içerikleri
-    sublist3r_stdout_content = None
-    subdomainizer_stdout_content = None # Bu artık parse edilecek
-    ffuf_json_content = None
+    # For Sublist3r, we need just the domain name.
+    parsed_url = urlparse(decoded_target_url)
+    domain_for_sublist3r = parsed_url.netloc
+    if not domain_for_sublist3r: # Fallback if netloc is empty (e.g., user entered "example.com")
+        domain_for_sublist3r = parsed_url.path.split('/')[0] # Take the first part of path
     
-    # Stderr içerikleri
-    sublist3r_stderr_content = None
-    subdomainizer_stderr_content = None
-    ffuf_console_stderr_content = None # FFUF'un konsol stderr'i
+    # Ensure domain_for_sublist3r is not empty before proceeding
+    if not domain_for_sublist3r:
+        # This case should ideally be caught earlier, or handled by returning an error.
+        # For now, redirecting back to index with an error.
+        return redirect(url_for('index', error="Geçersiz hedef: Alan adı çıkarılamadı."))
 
-    # Ayrıştırılmış SubDomainizer sonuçları
-    subdomainizer_subdomains = None
-    subdomainizer_cloud_urls = None
-    subdomainizer_secrets = None
 
-    # Genel dosya okuma hataları
-    file_read_error = {}
+    # Sanitize the original target URL for use in filenames (for log files)
+    # This base name will be used for stdout/stderr logs of all tools.
+    log_file_base = sanitize_filename(decoded_target_url) + "_"
 
-    def read_file_content(file_path, error_key):
-        content = None
-        if os.path.exists(file_path):
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-            except Exception as e:
-                file_read_error[error_key] = f"{os.path.basename(file_path)} okunamadı: {e}"
-        else:
-            file_read_error[error_key] = f"{os.path.basename(file_path)} bulunamadı."
-        return content
+    # --- Sublist3r Command ---
+    sublist3r_py_path = get_tool_path('Sublist3r/sublist3r')
+    sublist3r_command = ['python', sublist3r_py_path, '-d', domain_for_sublist3r]
+    run_command(sublist3r_command, log_file_base, "sublist3r")
 
-    if sublist3r_run:
-        sublist3r_stdout_file = os.path.join(app.config['UPLOAD_FOLDER'], f"{display_domain_key}_sublist3r_stdout.txt")
-        sublist3r_stderr_file = os.path.join(app.config['UPLOAD_FOLDER'], f"{display_domain_key}_sublist3r_stderr.txt")
-        sublist3r_stdout_content = read_file_content(sublist3r_stdout_file, 'sublist3r_stdout')
-        sublist3r_stderr_content = read_file_content(sublist3r_stderr_file, 'sublist3r_stderr')
+    # --- SubDomainizer Command ---
+    subdomainizer_py_path = get_tool_path('SubDomainizer/SubDomainizer')
+    # SubDomainizer typically takes the full URL.
+    subdomainizer_command = ['python', subdomainizer_py_path, '-u', decoded_target_url]
+    run_command(subdomainizer_command, log_file_base, "subdomainizer")
 
-    if subdomainizer_run:
-        subdomainizer_stdout_file = os.path.join(app.config['UPLOAD_FOLDER'], f"{display_domain_key}_subdomainizer_stdout.txt")
-        subdomainizer_stderr_file = os.path.join(app.config['UPLOAD_FOLDER'], f"{display_domain_key}_subdomainizer_stderr.txt")
+    # --- FFUF Command ---
+    # FFUF also uses the full URL. Append /FUZZ for directory/file fuzzing.
+    ffuf_target_url = decoded_target_url
+    if not ffuf_target_url.endswith('/'):
+        ffuf_target_url += '/'
+    ffuf_target_url += 'FUZZ' 
+    
+    ffuf_wordlist_path = get_wordlist_path('common_small.txt')
+    # Sanitize the original target URL specifically for FFUF's JSON output filename.
+    ffuf_json_output_filename_base = sanitize_filename(decoded_target_url)
+    ffuf_output_json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output', f"{ffuf_json_output_filename_base}_ffuf.json")
+    
+    ffuf_command = [
+        'ffuf', '-u', ffuf_target_url, '-w', ffuf_wordlist_path,
+        '-o', ffuf_output_json_path, '-of', 'json', # Specify JSON output path and format
+        '-c', # Colorize output in terminal (won't affect file logs much)
+        '-mc', '200,204,301,302,307,401,403,405,500' # Match these common status codes
+    ]
+    run_command(ffuf_command, log_file_base, "ffuf") # Stdout/stderr logs for ffuf
+
+    # Redirect to results page, passing the original (URL encoded) target.
+    return redirect(url_for('show_results', target=target))
+
+
+@app.route('/results/<target>')
+def show_results(target):
+    # Results display route: reads scan output files and renders them in the template.
+    decoded_target_url = unquote_plus(target)
+
+    # Base name for log files (stdout/stderr)
+    log_file_base = sanitize_filename(decoded_target_url) + "_"
+    # Base name for FFUF's JSON output file
+    ffuf_json_filename_base = sanitize_filename(decoded_target_url)
+
+    # Define paths to the output files
+    results_paths = {
+        'target': decoded_target_url,
+        'sublist3r_stdout': f"output/{log_file_base}sublist3r_stdout.txt",
+        'sublist3r_stderr': f"output/{log_file_base}sublist3r_stderr.txt",
+        'subdomainizer_stdout': f"output/{log_file_base}subdomainizer_stdout.txt",
+        'subdomainizer_stderr': f"output/{log_file_base}subdomainizer_stderr.txt",
+        'ffuf_json': f"output/{ffuf_json_filename_base}_ffuf.json", # Path to FFUF JSON output
+        'ffuf_stderr': f"output/{log_file_base}ffuf_stderr.txt", # FFUF's own stderr log
+    }
+
+    # --- Read Sublist3r Output ---
+    sublist3r_stdout_content = ""
+    try:
+        with open(results_paths['sublist3r_stdout'], 'r', encoding='utf-8') as f:
+            sublist3r_stdout_content = f.read()
         
-        raw_subdomainizer_stdout = read_file_content(subdomainizer_stdout_file, 'subdomainizer_stdout')
-        if raw_subdomainizer_stdout:
-            subdomainizer_subdomains, subdomainizer_cloud_urls, subdomainizer_secrets = parse_subdomainizer_output(raw_subdomainizer_stdout)
-        
-        subdomainizer_stderr_content = read_file_content(subdomainizer_stderr_file, 'subdomainizer_stderr')
+        # Check for "No subdomains found" condition for Sublist3r
+        # This logic looks for a specific line and then checks if subsequent lines are empty or only status/errors.
+        google_enum_finished_line = "[~] Finished now the Google Enumeration ..."
+        if google_enum_finished_line in sublist3r_stdout_content:
+            # Extract content after the "Finished Google Enumeration" line
+            content_after_google_enum = sublist3r_stdout_content.split(google_enum_finished_line, 1)[-1]
+            # Split into lines and remove leading/trailing whitespace from each
+            lines_after_google_enum = [line.strip() for line in content_after_google_enum.split('\n')]
             
-    if ffuf_run:
-        ffuf_json_file = os.path.join(app.config['UPLOAD_FOLDER'], f"{display_domain_key}_ffuf.json")
-        ffuf_console_stderr_file = os.path.join(app.config['UPLOAD_FOLDER'], f"{display_domain_key}_ffuf_stderr.txt")
-        ffuf_json_content = read_file_content(ffuf_json_file, 'ffuf_json')
-        ffuf_console_stderr_content = read_file_content(ffuf_console_stderr_file, 'ffuf_stderr')
+            # Filter out empty lines and lines that are known to be status/error messages from Sublist3r
+            potential_subdomain_lines = [
+                line for line in lines_after_google_enum 
+                if line and not line.startswith(('[!]', '[-]', '[~]', '[*]')) and not "Error:" in line
+            ]
+            # If no such lines exist, append the "No subdomains found" message.
+            if not potential_subdomain_lines:
+                 sublist3r_stdout_content += "\n\n[Bilgi] Belirtilen kriterlere göre alt alan adı bulunamadı (Google taraması sonrası)."
+    except FileNotFoundError:
+        sublist3r_stdout_content = "Sublist3r standart çıktı dosyası bulunamadı."
+    except Exception as e:
+        sublist3r_stdout_content = f"Sublist3r standart çıktı okunurken bir hata oluştu: {str(e)}"
 
-    return render_template('results_display.html', 
-                           domain_title=original_target,
-                           display_domain_key=display_domain_key,
-                           
-                           sublist3r_stdout_content=sublist3r_stdout_content,
-                           sublist3r_stderr_content=sublist3r_stderr_content,
-                           
-                           # Ayrıştırılmış SubDomainizer sonuçları
-                           subdomainizer_subdomains=subdomainizer_subdomains,
-                           subdomainizer_cloud_urls=subdomainizer_cloud_urls,
-                           subdomainizer_secrets=subdomainizer_secrets,
-                           # SubDomainizer'ın ham stdout'unu artık doğrudan göstermiyoruz, parse ediyoruz.
-                           # Eğer ham çıktıyı da göstermek isterseniz, onu da template'e yollayabilirsiniz.
-                           subdomainizer_stderr_content=subdomainizer_stderr_content,
-                           
-                           ffuf_json_content=ffuf_json_content,
-                           ffuf_console_stderr_content=ffuf_console_stderr_content,
-                           
-                           file_read_errors=file_read_error, # Dosya okuma hatalarını toplu gönder
-                           
-                           sublist3r_run=sublist3r_run,
-                           subdomainizer_run=subdomainizer_run,
-                           ffuf_run=ffuf_run
-                           )
+    sublist3r_stderr_content = ""
+    try:
+        with open(results_paths['sublist3r_stderr'], 'r', encoding='utf-8') as f:
+            sublist3r_stderr_content = f.read()
+    except FileNotFoundError:
+        sublist3r_stderr_content = "Sublist3r hata dosyası bulunamadı."
+    except Exception as e:
+        sublist3r_stderr_content = f"Sublist3r hata günlükleri okunurken bir hata oluştu: {str(e)}"
+
+    # --- Read SubDomainizer Output ---
+    subdomainizer_stdout_content = ""
+    try:
+        with open(results_paths['subdomainizer_stdout'], 'r', encoding='utf-8') as f:
+            subdomainizer_stdout_content = f.read()
+    except FileNotFoundError:
+        subdomainizer_stdout_content = "SubDomainizer standart çıktı dosyası bulunamadı."
+    except Exception as e:
+        subdomainizer_stdout_content = f"SubDomainizer sonuçları okunurken bir hata oluştu: {str(e)}"
+
+    subdomainizer_stderr_content = ""
+    try:
+        with open(results_paths['subdomainizer_stderr'], 'r', encoding='utf-8') as f:
+            subdomainizer_stderr_content = f.read()
+    except FileNotFoundError:
+        subdomainizer_stderr_content = "SubDomainizer hata dosyası bulunamadı."
+    except Exception as e:
+        subdomainizer_stderr_content = f"SubDomainizer hata günlükleri okunurken bir hata oluştu: {str(e)}"
+
+    # --- Read FFUF Output ---
+    ffuf_json_content_parsed = None # For parsed JSON data (list of results)
+    ffuf_json_content_raw = ""    # For raw JSON string (fallback or for display)
+    try:
+        with open(results_paths['ffuf_json'], 'r', encoding='utf-8') as f:
+            ffuf_json_content_raw = f.read() 
+            if ffuf_json_content_raw.strip(): # Proceed if file is not empty
+                data = json.loads(ffuf_json_content_raw)
+                # FFUF JSON structure has a 'results' key which is a list of findings.
+                ffuf_json_content_parsed = data.get('results', []) 
+            else: # File is empty or only whitespace
+                ffuf_json_content_parsed = [] # Treat as no results
+                ffuf_json_content_raw = "{}" # Represent empty JSON for raw display
+    except FileNotFoundError:
+        ffuf_json_content_raw = "FFUF JSON sonuç dosyası bulunamadı."
+        ffuf_json_content_parsed = [] # Pass empty list to template to avoid errors if file not found
+    except json.JSONDecodeError:
+        # If JSON parsing fails, ffuf_json_content_parsed remains None.
+        # The raw content (ffuf_json_content_raw) will be shown in the template.
+        # No need to set ffuf_json_content_raw again, it's already read.
+        ffuf_json_content_parsed = None 
+    except Exception as e:
+        ffuf_json_content_raw = f"FFUF JSON okunurken bir hata oluştu: {str(e)}"
+        ffuf_json_content_parsed = [] # Pass empty list on other errors
+
+    ffuf_stderr_content = ""
+    try:
+        with open(results_paths['ffuf_stderr'], 'r', encoding='utf-8') as f:
+            ffuf_stderr_content = f.read()
+    except FileNotFoundError:
+        ffuf_stderr_content = "FFUF konsol hata dosyası bulunamadı."
+    except Exception as e:
+        ffuf_stderr_content = f"FFUF konsol hata günlükleri okunurken bir hata oluştu: {str(e)}"
+
+    # Render the results template with all collected data
+    return render_template('results_display.html',
+                           target=decoded_target_url,
+                           sublist3r_stdout=sublist3r_stdout_content,
+                           sublist3r_stderr=sublist3r_stderr_content,
+                           subdomainizer_stdout=subdomainizer_stdout_content,
+                           subdomainizer_stderr=subdomainizer_stderr_content,
+                           ffuf_json_parsed=ffuf_json_content_parsed, 
+                           ffuf_json_raw=ffuf_json_content_raw, 
+                           ffuf_stderr=ffuf_stderr_content)
+
 
 if __name__ == '__main__':
+    # Run the Flask development server
+    # Debug mode should be False in a production environment
     app.run(debug=True)
