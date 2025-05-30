@@ -74,7 +74,7 @@
         </header>
 
         <main class="space-y-8">
-            {% if sublist3r_stdout or sublist3r_stderr %}
+            {% if 'sublist3r' in tools_run and (sublist3r_stdout or sublist3r_stderr) %}
             <div class="result-section bg-gray-700/50 p-5 md:p-6 rounded-lg shadow-lg">
                 <h2 class="text-xl md:text-2xl font-semibold text-gray-200 mb-4 border-b border-gray-600 pb-3">
                     <i class="fab fa-searchengin mr-2 text-purple-400"></i>Sublist3r Sonuçları
@@ -112,18 +112,20 @@
             </div>
             {% endif %}
 
-            {% if subdomainizer_stdout or subdomainizer_stderr %}
+            {% if 'subdomainizer' in tools_run and (subdomainizer_stdout or subdomainizer_stderr) %}
             <div class="result-section bg-gray-700/50 p-5 md:p-6 rounded-lg shadow-lg">
                 <h2 class="text-xl md:text-2xl font-semibold text-gray-200 mb-4 border-b border-gray-600 pb-3">
                     <i class="fas fa-code-branch mr-2 text-pink-500"></i>SubDomainizer Sonuçları
                 </h2>
 
-                {% if subdomainizer_cloud_urls is not none %}
-                <div class="bg-blue-800/70 text-blue-200 rounded-lg px-4 py-2 mb-4 shadow-md border border-blue-400 flex items-center">
-                    <i class="fas fa-cloud mr-2 text-blue-300"></i>
-                    <span><b>Total Cloud URLs:</b> {{ subdomainizer_cloud_urls }}</span>
+                {% if subdomainizer_cloudurls and subdomainizer_cloudurls|length > 0 %}
+                <div class="mb-4">
+                    <h3 class="text-lg font-medium text-blue-300 mb-2">Bulunan Cloud Servis URL'leri:</h3>
+                    <pre class="bg-gray-800 p-4 rounded-md overflow-x-auto text-sm max-h-80 custom-scrollbar">{{ subdomainizer_cloudurls|join('\n') }}</pre>
                 </div>
                 {% endif %}
+
+
                 {% if subdomainizer_stdout %}
                 <div id="subdomainizer_parsed_subdomains" class="parsed-content-container mb-4">
                     <h3 class="text-lg font-medium text-gray-300 mb-2">Bulunan Subdomainler:</h3>
@@ -133,6 +135,7 @@
                     <h3 class="text-lg font-medium text-gray-300 mb-2">Bulunan Secretler:</h3>
                     <pre class="bg-gray-800 p-4 rounded-md overflow-x-auto text-sm max-h-80 custom-scrollbar"><i>İşleniyor...</i></pre>
                 </div>
+                
                 <details class="bg-gray-700 rounded-md shadow-inner">
                     <summary class="cursor-pointer p-3 font-medium text-gray-300 hover:bg-gray-600/70 rounded-t-md">
                         Standart Çıktı (stdout)
@@ -160,7 +163,7 @@
             </div>
             {% endif %}
             
-            {% if ffuf_json_parsed is not none or ffuf_json_raw or ffuf_stderr %}
+            {% if 'ffuf' in tools_run and (ffuf_json_parsed is not none or ffuf_json_raw or ffuf_stderr) %}
             <div class="result-section bg-gray-700/50 p-6 rounded-lg shadow-lg mb-8">
                 <h2 class="text-2xl font-semibold text-gray-200 mb-4 border-b border-gray-600 pb-2">
                     <i class="fas fa-folder-open mr-2 text-red-500"></i>FFUF Sonuçları

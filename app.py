@@ -212,6 +212,7 @@ def show_results(scan_folder):
     # scan_log.json'dan hedefi bul
     scan_log_file = os.path.join(output_base, 'scan_log.json')
     decoded_target_url = scan_folder
+    tools_run = ['sublist3r', 'subdomainizer', 'ffuf']  # Varsayılan, eğer scan_log yoksa hepsi gösterilsin
     if os.path.exists(scan_log_file):
         import json
         with open(scan_log_file, 'r', encoding='utf-8') as f:
@@ -219,6 +220,7 @@ def show_results(scan_folder):
         for entry in scan_log:
             if entry['folder'] == scan_folder:
                 decoded_target_url = entry['target']
+                tools_run = entry.get('tools', tools_run)
                 break
     results_paths = {
         'target': decoded_target_url,
@@ -266,9 +268,24 @@ def show_results(scan_folder):
 
     # --- Read SubDomainizer Output ---
     subdomainizer_stdout_content = ""
+    subdomainizer_cloudurls = []
     try:
         with open(results_paths['subdomainizer_stdout'], 'r', encoding='utf-8') as f:
             subdomainizer_stdout_content = f.read()
+            # Cloud URL'leri ayrıştır
+            cloud_section = None
+            lines = subdomainizer_stdout_content.splitlines()
+            for idx, line in enumerate(lines):
+                if line.strip().startswith('Total Cloud URLs:'):
+                    # Sonraki satırlardan boş satır veya "_" ile başlayan satıra kadar olanları al
+                    cloud_section = []
+                    for l in lines[idx+1:]:
+                        if not l.strip() or l.strip().startswith('_'):
+                            break
+                        cloud_section.append(l.strip())
+                    break
+            if cloud_section:
+                subdomainizer_cloudurls = cloud_section
     except FileNotFoundError:
         subdomainizer_stdout_content = "SubDomainizer standart çıktı dosyası bulunamadı."
     except Exception as e:
@@ -324,9 +341,11 @@ def show_results(scan_folder):
                            sublist3r_stderr=sublist3r_stderr_content,
                            subdomainizer_stdout=subdomainizer_stdout_content,
                            subdomainizer_stderr=subdomainizer_stderr_content,
+                           subdomainizer_cloudurls=subdomainizer_cloudurls,
                            ffuf_json_parsed=ffuf_json_content_parsed, 
                            ffuf_json_raw=ffuf_json_content_raw, 
-                           ffuf_stderr=ffuf_stderr_content)
+                           ffuf_stderr=ffuf_stderr_content,
+                           tools_run=tools_run)
 
 
 if __name__ == '__main__':
