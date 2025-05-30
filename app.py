@@ -136,7 +136,11 @@ def index():
             scan_log = []
         # Aynı folder varsa tekrar ekleme
         if not any(entry['folder'] == scan_folder_name for entry in scan_log):
-            scan_log.append({'folder': scan_folder_name, 'target': target_url, 'tools': selected_tools})
+            # FFUF için wordlist alanını da kaydet
+            ffuf_wordlist = request.form.get('wordlist', '').strip()
+            if not ffuf_wordlist:
+                ffuf_wordlist = get_wordlist_path('common_small.txt')
+            scan_log.append({'folder': scan_folder_name, 'target': target_url, 'tools': selected_tools, 'ffuf_wordlist': ffuf_wordlist})
         with open(scan_log_file, 'w', encoding='utf-8') as f:
             json.dump(scan_log, f, ensure_ascii=False, indent=2)
         return redirect(url_for('run_scans', scan_folder=scan_folder_name))
@@ -189,7 +193,10 @@ def run_scans(scan_folder, tools=None):
         if not ffuf_target_url.endswith('/'):
             ffuf_target_url += '/'
         ffuf_target_url += 'FUZZ'
+        # Eğer kullanıcı özel bir wordlist girdiyse onu kullan, yoksa varsayılanı kullan
         ffuf_wordlist_path = get_wordlist_path('common_small.txt')
+        if 'ffuf_wordlist' in entry and entry['ffuf_wordlist']:
+            ffuf_wordlist_path = entry['ffuf_wordlist']
         ffuf_json_output_filename_base = scan_folder
         ffuf_output_json_path = os.path.join(scan_folder_path, f"{ffuf_json_output_filename_base}_ffuf.json")
         ffuf_command = [
