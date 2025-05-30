@@ -92,6 +92,22 @@ def sanitize_filename(name):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     # Main page route: handles form submission for starting a scan.
+    recent_scans = []
+    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output')
+    scan_log_file = os.path.join(output_dir, 'scan_log.json')
+    import json
+    if os.path.exists(scan_log_file):
+        with open(scan_log_file, 'r', encoding='utf-8') as f:
+            scan_log = json.load(f)
+        # Son eklenenler en üstte olacak şekilde ters sırala
+        recent_scans = list(reversed(scan_log))
+    else:
+        # Eski yöntem: sadece klasör isimleri
+        for folder in os.listdir(output_dir):
+            if folder.startswith('arama'):
+                recent_scans.append({'folder': folder, 'target': folder})
+        recent_scans.sort(key=lambda x: x['folder'], reverse=True)
+
     if request.method == 'POST':
         target_url = request.form.get('target')
         if not target_url:
@@ -107,50 +123,66 @@ def index():
             selected_tools.append('ffuf')
         # Araçları virgül ile birleştirip parametre olarak ilet
         tools_param = ','.join(selected_tools)
-        return redirect(url_for('run_scans', target=safe_target_for_url, tools=tools_param))
-    return render_template('index.html')
+        scan_folder_name = f"arama{len(recent_scans)+1}_{sanitize_filename(unquote_plus(target_url))}"
+        scan_folder_path = os.path.join(output_dir, scan_folder_name)
+        os.makedirs(scan_folder_path, exist_ok=True)
+        # Log tarama geçmişi
+        scan_log_file = os.path.join(output_dir, 'scan_log.json')
+        import json
+        if os.path.exists(scan_log_file):
+            with open(scan_log_file, 'r', encoding='utf-8') as f:
+                scan_log = json.load(f)
+        else:
+            scan_log = []
+        # Aynı folder varsa tekrar ekleme
+        if not any(entry['folder'] == scan_folder_name for entry in scan_log):
+            scan_log.append({'folder': scan_folder_name, 'target': target_url, 'tools': selected_tools})
+        with open(scan_log_file, 'w', encoding='utf-8') as f:
+            json.dump(scan_log, f, ensure_ascii=False, indent=2)
+        return redirect(url_for('run_scans', scan_folder=scan_folder_name))
+    return render_template('index.html', recent_scans=recent_scans)
 
-@app.route('/scan/<target>')
-@app.route('/scan/<target>/<tools>')
-def run_scans(target, tools=None):
-    # Scan execution route: decodes target, prepares commands, and runs them.
-    decoded_target_url = unquote_plus(target) # The full URL as provided by the user
+
+
+@app.route('/scan/<scan_folder>')
+def run_scans(scan_folder, tools=None):
+    # scan_folder ör: arama1_googlecom
+    output_base = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output')
+    scan_folder_path = os.path.join(output_base, scan_folder)
+    # scan_log.json'dan hedef ve araçları bul
+    import json
+    scan_log_file = os.path.join(output_base, 'scan_log.json')
+    decoded_target_url = None
     selected_tools = []
-    if tools:
-        selected_tools = tools.split(',')
-    else:
-        # Geriye dönük uyumluluk için, eğer parametre yoksa hepsini çalıştır
-        selected_tools = ['sublist3r', 'subdomainizer', 'ffuf']
-
+    if os.path.exists(scan_log_file):
+        with open(scan_log_file, 'r', encoding='utf-8') as f:
+            scan_log = json.load(f)
+        for entry in scan_log:
+            if entry['folder'] == scan_folder:
+                decoded_target_url = entry['target']
+                selected_tools = entry['tools']
+                break
+    if not decoded_target_url:
+        return redirect(url_for('index', error="Geçersiz tarama klasörü."))
     # For Sublist3r, we need just the domain name.
+    from urllib.parse import urlparse
     parsed_url = urlparse(decoded_target_url)
     domain_for_sublist3r = parsed_url.netloc
     if not domain_for_sublist3r:
         domain_for_sublist3r = parsed_url.path.split('/')[0]
     if not domain_for_sublist3r:
         return redirect(url_for('index', error="Geçersiz hedef: Alan adı çıkarılamadı."))
-
-    log_file_base = sanitize_filename(decoded_target_url) + "_"
-
-    # Her araç için çıktı klasörü oluştur
-    output_base = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output')
-    for tool in ['sublist3r', 'subdomainizer', 'ffuf']:
-        tool_dir = os.path.join(output_base, tool)
-        if not os.path.exists(tool_dir):
-            os.makedirs(tool_dir)
-
+    log_file_base = scan_folder + "_"
     # --- Sublist3r ---
     if 'sublist3r' in selected_tools:
         sublist3r_py_path = get_tool_path('Sublist3r/sublist3r')
         sublist3r_command = ['python', sublist3r_py_path, '-d', domain_for_sublist3r]
-        run_command(sublist3r_command, f"sublist3r/{log_file_base}", "sublist3r")
-
+        run_command(sublist3r_command, os.path.join(scan_folder, "sublist3r_"), "sublist3r")
     # --- SubDomainizer ---
     if 'subdomainizer' in selected_tools:
         subdomainizer_py_path = get_tool_path('SubDomainizer/SubDomainizer')
         subdomainizer_command = ['python', subdomainizer_py_path, '-u', decoded_target_url]
-        run_command(subdomainizer_command, f"subdomainizer/{log_file_base}", "subdomainizer")
-
+        run_command(subdomainizer_command, os.path.join(scan_folder, "subdomainizer_"), "subdomainizer")
     # --- FFUF ---
     if 'ffuf' in selected_tools:
         ffuf_target_url = decoded_target_url
@@ -158,35 +190,44 @@ def run_scans(target, tools=None):
             ffuf_target_url += '/'
         ffuf_target_url += 'FUZZ'
         ffuf_wordlist_path = get_wordlist_path('common_small.txt')
-        ffuf_json_output_filename_base = sanitize_filename(decoded_target_url)
-        ffuf_output_json_path = os.path.join(output_base, 'ffuf', f"{ffuf_json_output_filename_base}_ffuf.json")
+        ffuf_json_output_filename_base = scan_folder
+        ffuf_output_json_path = os.path.join(scan_folder_path, f"{ffuf_json_output_filename_base}_ffuf.json")
         ffuf_command = [
             'ffuf', '-u', ffuf_target_url, '-w', ffuf_wordlist_path,
             '-o', ffuf_output_json_path, '-of', 'json',
             '-c',
             '-mc', '200,204,301,302,307,401,403,405,500'
         ]
-        run_command(ffuf_command, f"ffuf/{log_file_base}", "ffuf")
+        run_command(ffuf_command, os.path.join(scan_folder, "ffuf_"), "ffuf")
+    return redirect(url_for('show_results', scan_folder=scan_folder))
 
-    return redirect(url_for('show_results', target=target, tools=tools))
 
 
-@app.route('/results/<target>')
-@app.route('/results/<target>/<tools>')
-def show_results(target, tools=None):
-    # Results display route: reads scan output files and renders them in the template.
-    decoded_target_url = unquote_plus(target)
-    log_file_base = sanitize_filename(decoded_target_url) + "_"
-    ffuf_json_filename_base = sanitize_filename(decoded_target_url)
-    # Yeni çıktı yolları (her araç için ayrı klasör)
+@app.route('/results/<scan_folder>')
+def show_results(scan_folder):
+    # scan_folder ör: arama1_googlecom
+    import re
+    output_base = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output')
+    scan_folder_path = os.path.join(output_base, scan_folder)
+    # scan_log.json'dan hedefi bul
+    scan_log_file = os.path.join(output_base, 'scan_log.json')
+    decoded_target_url = scan_folder
+    if os.path.exists(scan_log_file):
+        import json
+        with open(scan_log_file, 'r', encoding='utf-8') as f:
+            scan_log = json.load(f)
+        for entry in scan_log:
+            if entry['folder'] == scan_folder:
+                decoded_target_url = entry['target']
+                break
     results_paths = {
         'target': decoded_target_url,
-        'sublist3r_stdout': f"output/sublist3r/{log_file_base}sublist3r_stdout.txt",
-        'sublist3r_stderr': f"output/sublist3r/{log_file_base}sublist3r_stderr.txt",
-        'subdomainizer_stdout': f"output/subdomainizer/{log_file_base}subdomainizer_stdout.txt",
-        'subdomainizer_stderr': f"output/subdomainizer/{log_file_base}subdomainizer_stderr.txt",
-        'ffuf_json': f"output/ffuf/{ffuf_json_filename_base}_ffuf.json",
-        'ffuf_stderr': f"output/ffuf/{log_file_base}ffuf_stderr.txt",
+        'sublist3r_stdout': os.path.join(scan_folder_path, "sublist3r_sublist3r_stdout.txt"),
+        'sublist3r_stderr': os.path.join(scan_folder_path, "sublist3r_sublist3r_stderr.txt"),
+        'subdomainizer_stdout': os.path.join(scan_folder_path, "subdomainizer_subdomainizer_stdout.txt"),
+        'subdomainizer_stderr': os.path.join(scan_folder_path, "subdomainizer_subdomainizer_stderr.txt"),
+        'ffuf_json': os.path.join(scan_folder_path, f"{scan_folder}_ffuf.json"),
+        'ffuf_stderr': os.path.join(scan_folder_path, "ffuf_ffuf_stderr.txt"),
     }
 
     # --- Read Sublist3r Output ---
@@ -194,12 +235,9 @@ def show_results(target, tools=None):
     try:
         with open(results_paths['sublist3r_stdout'], 'r', encoding='utf-8') as f:
             sublist3r_stdout_content = f.read()
-        
-        # Check for "No subdomains found" condition for Sublist3r
-        # This logic looks for a specific line and then checks if subsequent lines are empty or only status/errors.
-        google_enum_finished_line = "[~] Finished now the Google Enumeration ..."
+        # Define the line that marks the end of Google enumeration in Sublist3r output
+        google_enum_finished_line = "[*] Google search finished."
         if google_enum_finished_line in sublist3r_stdout_content:
-            # Extract content after the "Finished Google Enumeration" line
             content_after_google_enum = sublist3r_stdout_content.split(google_enum_finished_line, 1)[-1]
             # Split into lines and remove leading/trailing whitespace from each
             lines_after_google_enum = [line.strip() for line in content_after_google_enum.split('\n')]
@@ -211,7 +249,7 @@ def show_results(target, tools=None):
             ]
             # If no such lines exist, append the "No subdomains found" message.
             if not potential_subdomain_lines:
-                 sublist3r_stdout_content += "\n\n[Bilgi] Belirtilen kriterlere göre alt alan adı bulunamadı (Google taraması sonrası)."
+                sublist3r_stdout_content += "\n\n[Bilgi] Belirtilen kriterlere göre alt alan adı bulunamadı (Google taraması sonrası)."
     except FileNotFoundError:
         sublist3r_stdout_content = "Sublist3r standart çıktı dosyası bulunamadı."
     except Exception as e:

@@ -118,6 +118,12 @@
                     <i class="fas fa-code-branch mr-2 text-pink-500"></i>SubDomainizer Sonuçları
                 </h2>
 
+                {% if subdomainizer_cloud_urls is not none %}
+                <div class="bg-blue-800/70 text-blue-200 rounded-lg px-4 py-2 mb-4 shadow-md border border-blue-400 flex items-center">
+                    <i class="fas fa-cloud mr-2 text-blue-300"></i>
+                    <span><b>Total Cloud URLs:</b> {{ subdomainizer_cloud_urls }}</span>
+                </div>
+                {% endif %}
                 {% if subdomainizer_stdout %}
                 <div id="subdomainizer_parsed_subdomains" class="parsed-content-container mb-4">
                     <h3 class="text-lg font-medium text-gray-300 mb-2">Bulunan Subdomainler:</h3>

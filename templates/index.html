@@ -78,6 +78,21 @@
             </div>
         {% endif %}
 
+        {% if recent_scans and recent_scans|length > 0 %}
+        <div class="bg-gray-700 p-4 rounded-lg mb-8">
+            <h2 class="text-lg font-semibold text-purple-300 mb-2"><i class="fas fa-history mr-1"></i> Son Taramalar</h2>
+            <ul class="space-y-1">
+                {% for scan in recent_scans %}
+                <li>
+                    <a href="{{ url_for('show_results', scan_folder=scan.folder) }}" class="text-purple-400 hover:underline">
+                        {{ scan.folder }} <span class="text-gray-400">({{ scan.target }})</span>
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
         <form method="POST" action="{{ url_for('index') }}" class="space-y-6">
             <div>
                 <label for="target" class="block text-sm font-medium text-gray-300 mb-1">Hedef Domain/URL:</label>
