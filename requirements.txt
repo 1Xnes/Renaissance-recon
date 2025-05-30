@@ -10,7 +10,7 @@ dnspython>=2.0.0 # Common for DNS tasks, Sublist3r uses it
 # Note: SubDomainizer lists specific versions. Try these, adjust if compatibility issues arise.
 termcolor==1.1.0
 # argparse is built-in with Python 3.2+, but if SubDomainizer needs a specific install:
-# argparse==1.4.0
+argparse==1.4.0
 beautifulsoup4==4.6.3
 htmlmin==0.1.12
 tldextract==2.2.0
@@ -19,6 +19,5 @@ cffi # Often a dependency for other packages
 
 # Common dependency for HTTP requests (used by Flask, Sublist3r, SubDomainizer)
 requests==2.21.0 # Using version from SubDomainizer, ensure compatibility
-
 # For Gemini API (we'll add this later, but good to have in mind)
 # google-generativeai>=0.5.0

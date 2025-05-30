@@ -29,6 +29,11 @@ Uygulamayı başlatmak için:
 python app.py
 Ardından web tarayıcınızda http://127.0.0.1:5000 adresine gidin.
 
+## Test edilebilecek URL'ler
+- https://nsonaniya2010.github.io/neeraj.github.io/
+- google.com
+- https://www.facebook.com
+
 (CLI kullanımı detayları eklenecek.)
 
 Katkıda Bulunma

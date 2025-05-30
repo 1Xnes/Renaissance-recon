@@ -1,367 +1,101 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OSINT & Recon Tool - Xnes</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>Renaissance Recon</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; color: #333; line-height: 1.6; }
-        .container { width: 90%; max-width: 1200px; margin: 30px auto; background-color: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); }
-        h1, h2, h3, h4 { color: #2c3e50; }
-        h1 { text-align: center; margin-bottom: 20px; }
-        .form-container { margin-bottom: 30px; padding: 20px; background-color: #f9f9f9; border-radius: 5px; border: 1px solid #e0e0e0;}
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
-        .form-group input[type="text"] { width: calc(100% - 22px); padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 1em; }
-        .tool-selection { margin-bottom:15px; padding: 10px; border: 1px dashed #ccc; border-radius: 4px;}
-        .tool-selection strong { display: block; margin-bottom: 8px;}
-        .tool-selection label { margin-right: 15px; font-weight: normal; cursor: pointer; }
-        .tool-selection input[type="checkbox"] { margin-right: 5px; vertical-align: middle; }
-        .button { display: inline-block; background-color: #3498db; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; transition: background-color 0.3s ease; }
-        .button:hover { background-color: #2980b9; }
-        .message { padding: 12px 15px; margin-top: 20px; border-radius: 4px; text-align: left; border-width: 1px; border-style: solid;}
-        .error-message { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; }
-        .success-message { background-color: #d4edda; color: #155724; border-color: #c3e6cb; }
-        .scan-status-notifications, .results-display-container { margin-top: 20px; padding: 15px; background-color: #fdfdfd; border-radius: 5px; border: 1px solid #dee2e6; }
-        .active-scans-section { margin-top: 20px; }
-        .active-scans-section h2 { border-bottom: 1px solid #ccc; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;}
-        #active_scans_list { list-style-type: none; padding-left: 0; }
-        #active_scans_list li { background-color: #fff; border: 1px solid #e0e0e0; padding: 12px 15px; margin-bottom: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        #active_scans_list li strong { margin-right: 8px; }
-        .scan-details { flex-grow: 1; min-width: 300px; margin-right: 10px;}
-        .scan-actions button { margin-left: 10px; white-space: nowrap; }
-        .button-small { padding: 6px 12px; font-size: 0.85em; background-color: #5bc0de; color:white; border:none; border-radius:3px; cursor:pointer; }
-        .button-small:hover { background-color: #31b0d5;}
-        .button-small-success { background-color: #5cb85c; }
-        .button-small-success:hover { background-color: #4cae4c; }
-        .status-queued { color: #777; font-style: italic; }
-        .status-ffuf-scan_id-preparing, .status-sublist3r-scan_id-preparing, .status-subdomainizer-scan_id-preparing,
-        .status-ffuf-scan_id-running, .status-sublist3r-scan_id-running, .status-subdomainizer-scan_id-running { color: #f0ad4e; } /* Orange for preparing/running */
-        .status-ffuf-scan_id-completed, .status-sublist3r-scan_id-completed, .status-subdomainizer-scan_id-completed { color: #5cb85c; font-weight: bold; } /* Green for completed */
-        .status-ffuf-scan_id-error-occurred, .status-sublist3r-scan_id-error-occurred, .status-subdomainizer-scan_id-error-occurred,
-        .status-ffuf-scan_id-critical-error-in-job, .status-sublist3r-scan_id-critical-error-in-job, .status-subdomainizer-scan_id-critical-error-in-job,
-        .status-thread-start-error, .status-ffuf-scan_id-error-no-response-from-wrapper { color: #d9534f; font-weight: bold; } /* Red for errors */
-        .error-detail-span { font-size: 0.8em; color: #c00; margin-left:10px; display: inline-block; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: help; vertical-align: middle;}
-        .command-used-text {font-family: 'Courier New', Courier, monospace; font-size: 0.8em; color: #555; margin-top: 5px; display: block; word-break: break-all;}
-        .results-list { list-style-type: disc; padding-left: 20px; margin-top: 5px;}
-        .results-list li { background-color: transparent; border: none; padding: 4px 0; margin-bottom: 2px; font-size: 0.9em; box-shadow: none;}
-        .results-list li a { text-decoration: none; color: #007bff; }
-        .results-list li a:hover { text-decoration: underline; }
-        pre { background-color: #272822; color: #f8f8f2; padding: 1em; border-radius: 4px; overflow-x: auto; font-size: 0.85em; white-space: pre-wrap; word-break: break-all; }
-        footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; font-size: 0.9em; color: #777; }
+        body {
+            font-family: 'Inter', sans-serif; /* Tailwind'in varsayılan fontu güzel ama Inter de popüler */
+        }
+        .tool-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .tool-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .btn-submit {
+            transition: background-color 0.3s ease, transform 0.3s ease;
+        }
+        .btn-submit:hover {
+            transform: translateY(-2px);
+        }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>OSINT & Recon Tool</h1>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
 
-        <div class="form-container">
-            <form method="POST" action="{{ url_for('index') }}">
-                <div class="form-group">
-                    <label for="target_domain_input">Target Domain/URL (e.g., example.com or http://example.com):</label>
-                    <input type="text" id="target_domain_input" name="target_domain" value="{{ target_domain_input if target_domain_input else '' }}" required>
-                </div>
-                <div class="form-group tool-selection">
-                    <strong>Tools to Run:</strong>
-                    <label><input type="checkbox" name="tools_to_run" value="ffuf" {% if 'ffuf' in request.form.getlist('tools_to_run') or (request.method == 'GET' and not active_scans_list) %}checked{% endif %}> ffuf (Directory/File)</label>
-                    <label><input type="checkbox" name="tools_to_run" value="sublist3r" {% if 'sublist3r' in request.form.getlist('tools_to_run') %}checked{% endif %}> Sublist3r (Subdomain)</label>
-                    <label><input type="checkbox" name="tools_to_run" value="subdomainizer" {% if 'subdomainizer' in request.form.getlist('tools_to_run') %}checked{% endif %}> SubDomainizer (JS Analysis/Secrets)</label>
-                </div>
-                <button type="submit" class="button">Start Scans</button>
-            </form>
-        </div>
+    <div class="bg-gray-800 p-8 md:p-12 rounded-xl shadow-2xl w-full max-w-2xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">
+                <i class="fas fa-user-secret mr-2"></i>Renaissance Recon
+            </h1>
+            <p class="text-gray-400 mt-2 text-lg">Web siteleri için kapsamlı bilgi toplama aracı.</p>
+        </header>
 
         {% if error %}
-            <p class="message error-message">{{ error }}</p>
+            <div class="bg-red-500 text-white p-4 rounded-lg mb-6 text-center">
+                <i class="fas fa-exclamation-triangle mr-2"></i>{{ error }}
+            </div>
         {% endif %}
-        {% if message %}
-            <p class="message success-message">{{ message | safe }}</p>
-        {% endif %}
-        
-        <div id="scan_status_notifications" class="scan-status-notifications" style="display:none; border-left-width: 5px; border-left-style: solid;">
+
+        <form method="POST" action="/" class="space-y-6">
+            <div>
+                <label for="domain" class="block text-sm font-medium text-gray-300 mb-1">Hedef Domain/URL:</label>
+                <input type="text" name="domain" id="domain" required
+                       class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                       placeholder="örnek.com veya https://örnek.com">
             </div>
 
-        {% if active_scans_list %}
-            <div class="active-scans-section">
-                <h2>
-                    Active and Completed Scans ({{ active_scans_list | length }})
-                    <button onclick="refreshAllScanResults()" class="button-small" style="font-size:0.9em;">Refresh All Completed Results</button>
-                </h2>
-                <ul id="active_scans_list">
-                    {% for scan_id, details in active_scans_list %}
-                        <li id="scan-item-{{ scan_id }}">
-                            <div class="scan-details">
-                                <strong>ID:</strong> {{ scan_id }} | 
-                                <strong>Target:</strong> <span title="{{ details.target }}">{{ details.target|truncate(35) }}</span> | 
-                                <strong>Tool:</strong> {{ details.tool }} <br>
-                                {% set status_class_text = details.status.lower().replace(' ', '-').replace('(', '').replace(')', '').replace('.', '').replace('ş','s').replace('ı','i').replace('ö','o').replace('ü','u').replace('ğ','g').replace('ç','c') %}
-                                <strong>Status:</strong> <span id="status-{{ scan_id }}" class="status-{{ status_class_text }}">{{ details.status }}</span>
-                                {% if details.error_message %}
-                                    <span class="error-detail-span" title="{{ details.error_message }}"> (Error Details)</span>
-                                {% endif %}
-                                {% if details.command_used %}
-                                 <span class="command-used-text" title="Full command: {{details.command_used}}">Command: {{ details.command_used|truncate(70) }}</span>
-                                {% endif %}
-                            </div>
-                            <div class="scan-actions">
-                                {% if details.status and (details.status.endswith('Running...') or details.status == 'Queued' or details.status.endswith('Preparing...')) %}
-                                    <button onclick="checkScanStatus('{{ scan_id }}', true)" class="button-small">Refresh Status</button>
-                                {% endif %}
-                                {% if details.status and details.status.endswith('Completed') %}
-                                    <button onclick="loadResults('{{ scan_id }}')" class="button-small button-small-success">View Results</button>
-                                {% endif %}
-                            </div>
-                        </li>
-                    {% endfor %}
-                </ul>
-            </div>
-            <div id="results_display_area" class="results-display-container" style="display:none;">
-                <h4>Results Viewer</h4>
+            <fieldset class="border border-gray-700 p-4 rounded-lg">
+                <legend class="text-lg font-semibold text-gray-200 px-2 mb-3">Çalıştırılacak Araçlar:</legend>
+                <div class="space-y-3">
+                    <div class="flex items-center tool-card bg-gray-750 p-3 rounded-md border border-gray-600 hover:border-purple-500">
+                        <input id="run_sublist3r" name="run_sublist3r" type="checkbox" checked
+                               class="h-5 w-5 text-purple-600 bg-gray-600 border-gray-500 rounded focus:ring-purple-500 focus:ring-offset-gray-800">
+                        <label for="run_sublist3r" class="ml-3 block text-sm font-medium text-gray-300">
+                            Sublist3r <span class="text-xs text-gray-500">(Alt Alan Adı Tespiti)</span>
+                        </label>
+                    </div>
+                    <div class="flex items-center tool-card bg-gray-750 p-3 rounded-md border border-gray-600 hover:border-purple-500">
+                        <input id="run_subdomainizer" name="run_subdomainizer" type="checkbox" checked
+                               class="h-5 w-5 text-purple-600 bg-gray-600 border-gray-500 rounded focus:ring-purple-500 focus:ring-offset-gray-800">
+                        <label for="run_subdomainizer" class="ml-3 block text-sm font-medium text-gray-300">
+                            SubDomainizer <span class="text-xs text-gray-500">(JS Analizi, Alt Alan Adları, Gizli Bilgiler)</span>
+                        </label>
+                    </div>
+                    <div class="flex items-center tool-card bg-gray-750 p-3 rounded-md border border-gray-600 hover:border-purple-500">
+                        <input id="run_ffuf" name="run_ffuf" type="checkbox"
+                               class="h-5 w-5 text-purple-600 bg-gray-600 border-gray-500 rounded focus:ring-purple-500 focus:ring-offset-gray-800">
+                        <label for="run_ffuf" class="ml-3 block text-sm font-medium text-gray-300">
+                            FFUF <span class="text-xs text-gray-500">(Dizin/Dosya Taraması)</span>
+                        </label>
+                    </div>
                 </div>
-        {% else %}
-            <p>No scans initiated yet.</p>
-        {% endif %}
+            </fieldset>
+            
+            <div>
+                <label for="wordlist" class="block text-sm font-medium text-gray-300 mb-1">FFUF için Kelime Listesi (Opsiyonel):</label>
+                <input type="text" name="wordlist" id="wordlist"
+                       class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                       placeholder="varsayılan: wordlists/common_small.txt">
+                <p class="mt-1 text-xs text-gray-500">Eğer boş bırakılırsa 'wordlists/common_small.txt' kullanılır.</p>
+            </div>
+
+            <div>
+                <button type="submit"
+                        class="w-full btn-submit bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-purple-500">
+                    <i class="fas fa-search mr-2"></i>Taramayı Başlat
+                </button>
+            </div>
+        </form>
     </div>
 
-    <footer>
-        <p>&copy; 2025 Xnes</p>
+    <footer class="text-center text-gray-500 mt-10 pb-4">
+        <p>&copy; 2025 Xnes. Tüm hakları saklıdır.</p>
     </footer>
 
-    <script>
-        const scanStatusNotificationsArea = document.getElementById('scan_status_notifications');
-        const resultsDisplayArea = document.getElementById('results_display_area');
-
-        function sanitizeStatusForClass(statusText) {
-            // This function prepares the status text to be used as a CSS class
-            if (!statusText || typeof statusText !== 'string') return 'unknown';
-            return statusText.toLowerCase()
-                .replace(/\s+/g, '-')      // Replace spaces with hyphens
-                .replace(/[().,şğıöüç]/g, char => { // Turkish and common problematic chars
-                    const map = {'.':'', '(':'', ')':'', 'ş':'s', 'ı':'i', 'ğ':'g', 'ö':'o', 'ü':'u', 'ç':'c'};
-                    return map[char] || ''; // Replace or remove
-                });
-        }
-
-        function updateScanListItem(scanId, data) {
-            // Updates a single scan item in the main list
-            const statusSpan = document.getElementById(`status-${scanId}`);
-            const scanItem = document.getElementById(`scan-item-${scanId}`);
-            if (!scanItem || !statusSpan) { 
-                console.warn(`List item or status span not found for scan ID: ${scanId}`);
-                return; 
-            }
-
-            statusSpan.textContent = data.status;
-            statusSpan.className = `status-${sanitizeStatusForClass(data.status)}`; // Apply sanitized class
-            
-            let actionsHtml = '';
-            if (data.status && (data.status.includes('Running...') || data.status === 'Queued' || data.status.includes('Preparing...'))) {
-                actionsHtml += `<button onclick="checkScanStatus('${scanId}', true)" class="button-small">Refresh Status</button>`;
-            }
-            if (data.status && data.status.includes('Completed')) { // "Tool (ID) - Completed"
-                actionsHtml += `<button onclick="loadResults('${scanId}')" class="button-small button-small-success">View Results</button>`;
-            }
-            const actionsDiv = scanItem.querySelector('.scan-actions');
-            if(actionsDiv) actionsDiv.innerHTML = actionsHtml;
-
-            let errorDetailSpan = scanItem.querySelector('.error-detail-span');
-            if (errorDetailSpan) errorDetailSpan.remove(); 
-
-            if (data.error_message && data.status && (data.status.includes('Error') || data.status.includes('Critical'))) {
-                const newErrorSpan = document.createElement('span');
-                newErrorSpan.className = 'error-detail-span';
-                newErrorSpan.title = data.error_message; // Full error on hover
-                newErrorSpan.textContent = " (Error Details)";
-                statusSpan.parentNode.insertBefore(newErrorSpan, statusSpan.nextSibling);
-            }
-        }
-
-        function checkScanStatus(scanId, manualTrigger = false) {
-            // Fetches and displays status for a single scan
-            if (manualTrigger) {
-                scanStatusNotificationsArea.style.display = 'block';
-                scanStatusNotificationsArea.innerHTML = `<p>Checking status for Scan ID ${scanId}...</p>`;
-                scanStatusNotificationsArea.style.borderColor = '#5bc0de'; // Info color
-            }
-
-            fetch(`/scan_status/${scanId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error && data.scan_id) {
-                         if(manualTrigger) scanStatusNotificationsArea.innerHTML = `<p style="color:red;">Error for Scan ID ${data.scan_id}: ${data.error}</p>`;
-                         if(manualTrigger) scanStatusNotificationsArea.style.borderColor = '#d9534f'; // Error color
-                         updateScanListItem(data.scan_id, {status: "Unknown Server Error", error_message: data.error, tool: data.tool || 'Unknown', target: data.target || 'Unknown', command_used: data.command_used});
-                         return;
-                    } else if (data.error) { // General API error
-                        if(manualTrigger) scanStatusNotificationsArea.innerHTML = `<p style="color:red;">Status API Error: ${data.error}</p>`;
-                        if(manualTrigger) scanStatusNotificationsArea.style.borderColor = '#d9534f';
-                        return;
-                    }
-                    
-                    if(manualTrigger) {
-                        let statusHtml = `<h4>Scan Status (${data.scan_id}) <button onclick="scanStatusNotificationsArea.style.display='none'" style="float:right;font-size:0.8em;padding:3px 6px;">Close</button></h4>
-                                      <p><strong>Target:</strong> ${data.target}<br>
-                                      <strong>Tool:</strong> ${data.tool}<br>
-                                      <strong>Status:</strong> <span class="status-${sanitizeStatusForClass(data.status)}">${data.status}</span>`;
-                        if (data.error_message) {
-                            statusHtml += `<br><strong style="color:red;">Error Message:</strong> <pre style="font-size:0.8em; white-space:pre-wrap;max-height:100px;overflow-y:auto;">${data.error_message}</pre></p>`;
-                             scanStatusNotificationsArea.style.borderColor = '#d9534f'; 
-                        } else if (data.status && data.status.includes('Completed')) {
-                            statusHtml += `<br>Results are ready. <button onclick="loadResults('${data.scan_id}')" class="button-small button-small-success">Load Results</button></p>`;
-                            scanStatusNotificationsArea.style.borderColor = '#5cb85c'; 
-                        } else if (data.status && (data.status.includes('Running') || data.status.includes('Queued') || data.status.includes('Preparing'))) {
-                            statusHtml += ` <button onclick="checkScanStatus('${data.scan_id}', true)" class="button-small">Check Again</button></p>`;
-                            scanStatusNotificationsArea.style.borderColor = '#f0ad4e'; 
-                        } else {
-                            statusHtml += `</p>`;
-                            scanStatusNotificationsArea.style.borderColor = '#ccc'; // Neutral color
-                        }
-                        if(data.command_used){
-                            statusHtml += `<p style="font-size:0.8em; color:#555;"><strong>Command Used:</strong> ${data.command_used}</p>`;
-                        }
-                        scanStatusNotificationsArea.innerHTML = statusHtml;
-                    }
-                    updateScanListItem(scanId, data); // Update the main list item as well
-                })
-                .catch(error => {
-                    console.error(`Error checking status for ${scanId}:`, error);
-                    if(manualTrigger) {
-                        scanStatusNotificationsArea.innerHTML = `<p style="color:red;">Could not retrieve status for ${scanId} (Network Error or Server Down).</p>`;
-                        scanStatusNotificationsArea.style.borderColor = '#d9534f';
-                    }
-                    // Update the list item to reflect connection error
-                    updateScanListItem(scanId, {status: "Connection Error", error_message: "Could not reach server for status update."});
-                });
-        }
-
-        function displayResults(tool, resultsData, commandUsed) {
-            // Displays formatted results based on the tool
-            let content = '';
-             if (commandUsed) { // Display the command used for this scan
-                content += `<p style="font-size:0.8em; color:#555;"><strong>Command Used:</strong> ${commandUsed}</p>`;
-            }
-
-            // Check for empty or null results
-            const isEmptyResults = !resultsData || 
-                                 (Array.isArray(resultsData) && resultsData.length === 0) ||
-                                 (typeof resultsData === 'object' && !Array.isArray(resultsData) && Object.keys(resultsData).every(k => !resultsData[k] || (Array.isArray(resultsData[k]) && resultsData[k].length === 0) ));
-
-            if (isEmptyResults) {
-                return content + '<p>No significant results found for this tool, or the results were empty.</p>';
-            }
-
-            if (tool === 'ffuf') { // Expected: resultsData = [{"url": ..., "status": ..., "length": ...}, ...]
-                content += '<h4>Found Paths/Files:</h4><ul class="results-list">';
-                if (Array.isArray(resultsData) && resultsData.length > 0) {
-                    resultsData.forEach(item => {
-                        content += `<li><a href="${item.url}" target="_blank" rel="noopener noreferrer">${item.url}</a> [Status: ${item.status}, Length: ${item.length}]</li>`;
-                    });
-                } else { content += '<li>No paths found.</li>';}
-                content += '</ul>';
-            } else if (tool === 'sublist3r') { // Expected: resultsData = ["sub1.example.com", "sub2.example.com", ...]
-                content += '<h4>Found Subdomains:</h4><ul class="results-list">';
-                if (Array.isArray(resultsData) && resultsData.length > 0) {
-                    resultsData.forEach(subdomain => { content += `<li>${subdomain}</li>`; });
-                } else { content += '<li>No subdomains found.</li>';}
-                content += '</ul>';
-            } else if (tool === 'subdomainizer') { // Expected: resultsData = {"secrets": [], "cloud_assets": [], "subdomains_from_js": []}
-                content += '<h4>SubDomainizer Findings:</h4>';
-                
-                content += '<h5>Subdomains from JS:</h5>';
-                if (resultsData.subdomains_from_js && resultsData.subdomains_from_js.length > 0) {
-                    content += '<ul class="results-list">';
-                    resultsData.subdomains_from_js.forEach(item => content += `<li>${item}</li>`);
-                    content += '</ul>';
-                } else { content += '<p>No subdomains found in JS files.</p>';}
-
-                content += '<h5>Potential Secrets (Review Carefully!):</h5>';
-                if (resultsData.secrets && resultsData.secrets.length > 0) {
-                    content += '<ul class="results-list">';
-                    resultsData.secrets.forEach(item => content += `<li><pre>${typeof item === 'string' ? item.replace(/</g, "&lt;").replace(/>/g, "&gt;") : JSON.stringify(item, null, 2)}</pre></li>`);
-                    content += '</ul>';
-                } else { content += '<p>No potential secrets found.</p>';}
-
-                content += '<h5>Cloud Assets:</h5>';
-                if (resultsData.cloud_assets && resultsData.cloud_assets.length > 0) {
-                    content += '<ul class="results-list">';
-                    resultsData.cloud_assets.forEach(item => content += `<li><a href="${item}" target="_blank" rel="noopener noreferrer">${item}</a></li>`); // Assuming these are URLs
-                    content += '</ul>';
-                } else { content += '<p>No cloud assets found.</p>';}
-            } else { // Fallback for unknown tools or generic JSON display
-                content += '<h4>Generic Results:</h4><pre>' + JSON.stringify(resultsData, null, 2) + '</pre>';
-            }
-            return content;
-        }
-
-        function loadResults(scanId) {
-            // Fetches and displays results for a completed scan
-            resultsDisplayArea.style.display = 'block';
-            resultsDisplayArea.innerHTML = `<h4>Loading Results for Scan ID: ${scanId}... <button onclick="resultsDisplayArea.style.display='none'; resultsDisplayArea.innerHTML='<h4>Results Viewer</h4>';" style="float:right;font-size:0.8em;padding:3px 6px;">Close</button></h4>`;
-            
-            fetch(`/get_scan_results/${scanId}`)
-                .then(response => {
-                    if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}, message: ${response.statusText || 'Unknown Error'}`); }
-                    return response.json();
-                })
-                .then(data => {
-                    if (data.error) {
-                        resultsDisplayArea.innerHTML = `<h4 style="color:red;">Could not load results for ${scanId}</h4><p>${data.error}</p> <button onclick="resultsDisplayArea.style.display='none'; resultsDisplayArea.innerHTML='<h4>Results Viewer</h4>';" style="float:right;font-size:0.8em;padding:3px 6px;">Close</button>`;
-                        return;
-                    }
-                    let resultsHtml = `<h3>${data.tool} Results (${data.scan_id} - ${data.target}) <button onclick="resultsDisplayArea.style.display='none'; resultsDisplayArea.innerHTML='<h4>Results Viewer</h4>';" style="float:right;font-size:0.8em;padding:3px 6px;">Close</button></h3>`;
-                    resultsHtml += displayResults(data.tool, data.results, data.command_used);
-                    resultsDisplayArea.innerHTML = resultsHtml;
-                })
-                .catch(error => {
-                    console.error(`Error loading results for ${scanId}:`, error);
-                    resultsDisplayArea.innerHTML = `<h4 style="color:red;">Could not load results for ${scanId}</h4><p>Details: ${error.message}</p> <button onclick="resultsDisplayArea.style.display='none'; resultsDisplayArea.innerHTML='<h4>Results Viewer</h4>';" style="float:right;font-size:0.8em;padding:3px 6px;">Close</button>`;
-                });
-        }
-        
-        function refreshAllScanResults() {
-            // Iterates through completed scans and calls loadResults for each
-            // This is for the new global "Refresh All Completed Results" button
-            const scanListItems = document.querySelectorAll('#active_scans_list li');
-            let foundCompleted = false;
-            scanListItems.forEach(item => {
-                const scanId = item.id.replace('scan-item-', '');
-                const statusSpan = document.getElementById(`status-${scanId}`);
-                if (statusSpan && statusSpan.textContent.includes('Completed')) {
-                    console.log(`Refreshing results for completed scan: ${scanId}`);
-                    loadResults(scanId); // This will open/update the results display area
-                    foundCompleted = true;
-                }
-            });
-            if (!foundCompleted) {
-                resultsDisplayArea.style.display = 'block';
-                resultsDisplayArea.innerHTML = '<h4>No completed scans found to refresh.</h4>';
-            } else {
-                 // Optionally, scroll to the results area
-                 // resultsDisplayArea.scrollIntoView({ behavior: 'smooth' });
-            }
-        }
-
-        // Optional: Auto-refresh status of running scans periodically
-        // Be mindful of server load if you enable aggressive polling.
-        /*
-        setInterval(function() {
-            let hasActiveScans = false;
-            document.querySelectorAll('#active_scans_list li').forEach(item => {
-                const scanId = item.id.replace('scan-item-', '');
-                const statusSpan = document.getElementById(`status-${scanId}`);
-                if (statusSpan && (statusSpan.textContent.includes('Running') || statusSpan.textContent.includes('Queued') || statusSpan.textContent.includes('Preparing'))) {
-                    hasActiveScans = true;
-                    // console.log(`Auto-refreshing status for: ${scanId}`);
-                    checkScanStatus(scanId, false); // 'false' means don't update the main notification area, just the list item
-                }
-            });
-            // if (!hasActiveScans && autoRefreshInterval) { // Logic to stop interval if no active scans
-            //     clearInterval(autoRefreshInterval);
-            //     autoRefreshInterval = null;
-            // }
-        }, 20000); // Refresh every 20 seconds
-        */
-    </script>
 </body>
 </html>
