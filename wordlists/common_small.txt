@@ -6,7 +6,6 @@ config
 .git
 api
 uploads
-index.html
 static
 js
 css

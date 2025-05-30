@@ -153,16 +153,16 @@
                 {% endif %}
             </div>
             {% endif %}
-
+            
             {% if ffuf_json_parsed is not none or ffuf_json_raw or ffuf_stderr %}
-            <div class="result-section bg-gray-700/50 p-5 md:p-6 rounded-lg shadow-lg">
-                <h2 class="text-xl md:text-2xl font-semibold text-gray-200 mb-4 border-b border-gray-600 pb-3">
+            <div class="result-section bg-gray-700/50 p-6 rounded-lg shadow-lg mb-8">
+                <h2 class="text-2xl font-semibold text-gray-200 mb-4 border-b border-gray-600 pb-2">
                     <i class="fas fa-folder-open mr-2 text-red-500"></i>FFUF Sonuçları
                 </h2>
-                {% if ffuf_json_parsed and ffuf_json_parsed.results %}
+                {% if ffuf_json_parsed is not none and ffuf_json_parsed %} {# Assuming ffuf_json_parsed is the list of results #}
                     <h3 class="text-lg font-medium text-gray-300 mb-3">Bulunan Yollar:</h3>
                     <div class="overflow-x-auto rounded-md shadow">
-                        <table class="ffuf-results-table w-full text-sm text-left text-gray-300 bg-gray-800/80">
+                        <table class="ffuf-results-table w-full text-sm text-left text-gray-300 bg-gray-800">
                             <thead class="text-xs text-gray-200 uppercase bg-gray-700">
                                 <tr>
                                     <th scope="col" class="px-6 py-3">URL</th>
@@ -173,7 +173,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for result in ffuf_json_parsed.results %}
+                                {% for result in ffuf_json_parsed %} {# Iterate directly if it's a list #}
                                 <tr class="bg-gray-800 border-b border-gray-700 hover:bg-gray-700/70">
                                     <td class="px-6 py-4 font-medium whitespace-nowrap">
                                         <a href="{{ result.url }}" target="_blank" rel="noopener noreferrer">{{ result.url }}</a>
@@ -187,28 +187,34 @@
                             </tbody>
                         </table>
                     </div>
-                {% elif ffuf_json_parsed is not none and not ffuf_json_parsed.results %} <p class="text-gray-400 my-4"><i class="fas fa-info-circle mr-1 text-blue-400"></i>FFUF ile herhangi bir yol bulunamadı veya filtrelere uyan sonuç yok.</p>
-                {% endif %}
-
-                {% if ffuf_json_parsed is none and ffuf_json_raw %} <h3 class="text-lg font-medium text-gray-300 mt-4 mb-2">JSON Çıktısı (Ham Veri):</h3>
+                {% elif ffuf_json_parsed is none and ffuf_json_raw %}
+                    <h3 class="text-lg font-medium text-gray-300 mb-2">JSON Çıktısı (Ham Veri):</h3>
                     <p class="text-sm text-yellow-400 mb-2"><i class="fas fa-exclamation-triangle mr-1"></i>JSON verisi işlenirken bir sorun oluştu veya dosya bulunamadı. Ham veri aşağıdadır:</p>
-                    <pre class="bg-gray-800 p-4 rounded-md overflow-x-auto text-sm max-h-96 custom-scrollbar">{{ ffuf_json_raw }}</pre>
-                {% elif not ffuf_json_parsed and not ffuf_json_raw and not ffuf_stderr %} <p class="text-gray-400"><i class="fas fa-info-circle mr-1 text-blue-400"></i>FFUF için gösterilecek sonuç veya çıktı bulunmamaktadır.</p>
+                    <pre class="bg-gray-800 p-4 rounded-md overflow-x-auto text-sm max-h-96 custom-scrollbar">{{ ffuf_json_raw if ffuf_json_raw.strip() else "FFUF JSON çıktısı yok veya işlenemedi." }}</pre>
+                {% else %} {# Covers ffuf_json_parsed is not None but empty, or no data at all #}
+                    <p class="text-gray-400 my-4"><i class="fas fa-info-circle mr-1 text-blue-400"></i>FFUF ile herhangi bir yol bulunamadı veya filtrelere uyan sonuç yok.</p>
+                    {% if ffuf_json_raw %}
+                    <h3 class="text-lg font-medium text-gray-300 mb-2">JSON Çıktısı (Ham Veri):</h3>
+                    <pre class="bg-gray-800 p-4 rounded-md overflow-x-auto text-sm max-h-96 custom-scrollbar">{{ ffuf_json_raw if ffuf_json_raw.strip() else "FFUF JSON çıktısı boş." }}</pre>
+                    {% endif %}
                 {% endif %}
 
                 {% if ffuf_stderr %}
                 <details class="mt-6 bg-gray-700 rounded-md shadow-inner">
                     <summary class="cursor-pointer p-3 font-medium text-gray-300 hover:bg-gray-600/70 rounded-t-md">
-                        Konsol Hata Çıktısı (stderr)
+                        Konsol Hata Çıktısı (stderr):
                     </summary>
                     <div class="p-3 border-t border-gray-600">
-                         <pre class="bg-gray-800 p-4 rounded-b-md overflow-x-auto text-sm max-h-60 custom-scrollbar">{{ ffuf_stderr }}</pre>
+                         <pre class="bg-gray-800 p-4 rounded-b-md overflow-x-auto text-sm max-h-60 custom-scrollbar">{{ ffuf_stderr if ffuf_stderr.strip() else "FFUF için konsol hata çıktısı yok." }}</pre>
                     </div>
                 </details>
                 {% endif %}
+                 {% if not ffuf_json_parsed and not ffuf_json_raw and not ffuf_stderr %}
+                    <p class="text-gray-400"><i class="fas fa-info-circle mr-1 text-blue-400"></i>FFUF için gösterilecek sonuç veya çıktı bulunmamaktadır.</p>
+                {% endif %}
             </div>
             {% endif %}
-        </main>
+            </main>
 
         <footer class="mt-12 text-center">
             <a href="{{ url_for('index') }}"
