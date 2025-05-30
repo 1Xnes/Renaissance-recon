@@ -93,93 +93,100 @@ def sanitize_filename(name):
 def index():
     # Main page route: handles form submission for starting a scan.
     if request.method == 'POST':
-        # Use request.form.get('target') to avoid KeyError if 'target' is not in the form
-        target_url = request.form.get('target') 
+        target_url = request.form.get('target')
         if not target_url:
-            # Handle empty target or missing target field
             return render_template('index.html', error="Hedef URL boş olamaz veya formda 'target' alanı eksik.")
-        
-        # URL encode the target to make it safe for use in a URL path
         safe_target_for_url = quote_plus(target_url)
-        return redirect(url_for('run_scans', target=safe_target_for_url))
+        # Araç seçimlerini al
+        selected_tools = []
+        if request.form.get('run_sublist3r'):
+            selected_tools.append('sublist3r')
+        if request.form.get('run_subdomainizer'):
+            selected_tools.append('subdomainizer')
+        if request.form.get('run_ffuf'):
+            selected_tools.append('ffuf')
+        # Araçları virgül ile birleştirip parametre olarak ilet
+        tools_param = ','.join(selected_tools)
+        return redirect(url_for('run_scans', target=safe_target_for_url, tools=tools_param))
     return render_template('index.html')
 
 @app.route('/scan/<target>')
-def run_scans(target):
+@app.route('/scan/<target>/<tools>')
+def run_scans(target, tools=None):
     # Scan execution route: decodes target, prepares commands, and runs them.
     decoded_target_url = unquote_plus(target) # The full URL as provided by the user
+    selected_tools = []
+    if tools:
+        selected_tools = tools.split(',')
+    else:
+        # Geriye dönük uyumluluk için, eğer parametre yoksa hepsini çalıştır
+        selected_tools = ['sublist3r', 'subdomainizer', 'ffuf']
 
     # For Sublist3r, we need just the domain name.
     parsed_url = urlparse(decoded_target_url)
     domain_for_sublist3r = parsed_url.netloc
-    if not domain_for_sublist3r: # Fallback if netloc is empty (e.g., user entered "example.com")
-        domain_for_sublist3r = parsed_url.path.split('/')[0] # Take the first part of path
-    
-    # Ensure domain_for_sublist3r is not empty before proceeding
     if not domain_for_sublist3r:
-        # This case should ideally be caught earlier, or handled by returning an error.
-        # For now, redirecting back to index with an error.
+        domain_for_sublist3r = parsed_url.path.split('/')[0]
+    if not domain_for_sublist3r:
         return redirect(url_for('index', error="Geçersiz hedef: Alan adı çıkarılamadı."))
 
-
-    # Sanitize the original target URL for use in filenames (for log files)
-    # This base name will be used for stdout/stderr logs of all tools.
     log_file_base = sanitize_filename(decoded_target_url) + "_"
 
-    # --- Sublist3r Command ---
-    sublist3r_py_path = get_tool_path('Sublist3r/sublist3r')
-    sublist3r_command = ['python', sublist3r_py_path, '-d', domain_for_sublist3r]
-    run_command(sublist3r_command, log_file_base, "sublist3r")
+    # Her araç için çıktı klasörü oluştur
+    output_base = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output')
+    for tool in ['sublist3r', 'subdomainizer', 'ffuf']:
+        tool_dir = os.path.join(output_base, tool)
+        if not os.path.exists(tool_dir):
+            os.makedirs(tool_dir)
 
-    # --- SubDomainizer Command ---
-    subdomainizer_py_path = get_tool_path('SubDomainizer/SubDomainizer')
-    # SubDomainizer typically takes the full URL.
-    subdomainizer_command = ['python', subdomainizer_py_path, '-u', decoded_target_url]
-    run_command(subdomainizer_command, log_file_base, "subdomainizer")
+    # --- Sublist3r ---
+    if 'sublist3r' in selected_tools:
+        sublist3r_py_path = get_tool_path('Sublist3r/sublist3r')
+        sublist3r_command = ['python', sublist3r_py_path, '-d', domain_for_sublist3r]
+        run_command(sublist3r_command, f"sublist3r/{log_file_base}", "sublist3r")
 
-    # --- FFUF Command ---
-    # FFUF also uses the full URL. Append /FUZZ for directory/file fuzzing.
-    ffuf_target_url = decoded_target_url
-    if not ffuf_target_url.endswith('/'):
-        ffuf_target_url += '/'
-    ffuf_target_url += 'FUZZ' 
-    
-    ffuf_wordlist_path = get_wordlist_path('common_small.txt')
-    # Sanitize the original target URL specifically for FFUF's JSON output filename.
-    ffuf_json_output_filename_base = sanitize_filename(decoded_target_url)
-    ffuf_output_json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output', f"{ffuf_json_output_filename_base}_ffuf.json")
-    
-    ffuf_command = [
-        'ffuf', '-u', ffuf_target_url, '-w', ffuf_wordlist_path,
-        '-o', ffuf_output_json_path, '-of', 'json', # Specify JSON output path and format
-        '-c', # Colorize output in terminal (won't affect file logs much)
-        '-mc', '200,204,301,302,307,401,403,405,500' # Match these common status codes
-    ]
-    run_command(ffuf_command, log_file_base, "ffuf") # Stdout/stderr logs for ffuf
+    # --- SubDomainizer ---
+    if 'subdomainizer' in selected_tools:
+        subdomainizer_py_path = get_tool_path('SubDomainizer/SubDomainizer')
+        subdomainizer_command = ['python', subdomainizer_py_path, '-u', decoded_target_url]
+        run_command(subdomainizer_command, f"subdomainizer/{log_file_base}", "subdomainizer")
 
-    # Redirect to results page, passing the original (URL encoded) target.
-    return redirect(url_for('show_results', target=target))
+    # --- FFUF ---
+    if 'ffuf' in selected_tools:
+        ffuf_target_url = decoded_target_url
+        if not ffuf_target_url.endswith('/'):
+            ffuf_target_url += '/'
+        ffuf_target_url += 'FUZZ'
+        ffuf_wordlist_path = get_wordlist_path('common_small.txt')
+        ffuf_json_output_filename_base = sanitize_filename(decoded_target_url)
+        ffuf_output_json_path = os.path.join(output_base, 'ffuf', f"{ffuf_json_output_filename_base}_ffuf.json")
+        ffuf_command = [
+            'ffuf', '-u', ffuf_target_url, '-w', ffuf_wordlist_path,
+            '-o', ffuf_output_json_path, '-of', 'json',
+            '-c',
+            '-mc', '200,204,301,302,307,401,403,405,500'
+        ]
+        run_command(ffuf_command, f"ffuf/{log_file_base}", "ffuf")
+
+    return redirect(url_for('show_results', target=target, tools=tools))
 
 
 @app.route('/results/<target>')
-def show_results(target):
+@app.route('/results/<target>/<tools>')
+def show_results(target, tools=None):
     # Results display route: reads scan output files and renders them in the template.
     decoded_target_url = unquote_plus(target)
-
-    # Base name for log files (stdout/stderr)
     log_file_base = sanitize_filename(decoded_target_url) + "_"
-    # Base name for FFUF's JSON output file
     ffuf_json_filename_base = sanitize_filename(decoded_target_url)
-
-    # Define paths to the output files
+    # Yeni çıktı yolları (her araç için ayrı klasör)
     results_paths = {
         'target': decoded_target_url,
-        'sublist3r_stdout': f"output/{log_file_base}sublist3r_stdout.txt",
-        'sublist3r_stderr': f"output/{log_file_base}sublist3r_stderr.txt",
-        'subdomainizer_stdout': f"output/{log_file_base}subdomainizer_stdout.txt",
-        'subdomainizer_stderr': f"output/{log_file_base}subdomainizer_stderr.txt",
-        'ffuf_json': f"output/{ffuf_json_filename_base}_ffuf.json", # Path to FFUF JSON output
-        'ffuf_stderr': f"output/{log_file_base}ffuf_stderr.txt", # FFUF's own stderr log
+        'sublist3r_stdout': f"output/sublist3r/{log_file_base}sublist3r_stdout.txt",
+        'sublist3r_stderr': f"output/sublist3r/{log_file_base}sublist3r_stderr.txt",
+        'subdomainizer_stdout': f"output/subdomainizer/{log_file_base}subdomainizer_stdout.txt",
+        'subdomainizer_stderr': f"output/subdomainizer/{log_file_base}subdomainizer_stderr.txt",
+        'ffuf_json': f"output/ffuf/{ffuf_json_filename_base}_ffuf.json",
+        'ffuf_stderr': f"output/ffuf/{log_file_base}ffuf_stderr.txt",
     }
 
     # --- Read Sublist3r Output ---
