@@ -20,7 +20,7 @@ Python 3.9 veya üzeri bir sürüm gereklidir.
 
 1.  **Repoyu Klonlayın:**
     ```bash
-    git clone https://github.com/Xnes/Renaissance-recon.git
+    git clone https://github.com/1Xnes/Renaissance-recon.git
     cd Renaissance-recon
     ```
 
