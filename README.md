@@ -39,6 +39,34 @@ Python 3.9 veya üzeri bir sürüm gereklidir.
     GEMINI_API_KEY='YOUR_API_KEY_HERE'
     ```
 
+## Docker ile Çalıştırma (Opsiyonel)
+
+Projeyi Docker kullanarak da çalıştırabilirsiniz. Bu, bağımlılıkların ve araçların kurulumuyla uğraşmanızı engeller.
+
+1.  **Docker Image'ını Oluşturun:**
+    Proje ana dizinindeyken aşağıdaki komutu çalıştırın:
+    ```bash
+    docker build -t renaissance-recon .
+    ```
+
+2.  **Docker Container'ını Başlatın:**
+    ```bash
+    docker run -p 5000:5000 -v ${PWD}/output:/app/output renaissance-recon
+    ```
+    *   **Not (Windows PowerShell kullanıcıları için):** Eğer yukarıdaki komut `-v` parametresiyle ilgili "invalid reference format" hatası verirse, `$(pwd)` yerine `${PWD}` kullanmayı deneyin. Alternatif olarak, `"%cd%/output:/app/output"` şeklinde de kullanabilirsiniz veya `C:\path\to\your\Renaissance-recon\output` gibi tam yolu belirtebilirsiniz.
+    *   `-p 5000:5000`: Container içerisindeki 5000 portunu host makinenizdeki 5000 portuna yönlendirir.
+    *   Eğer Gemini API anahtarını kullanmak istiyorsanız, `.env` dosyanızı container'a dahil etmeniz veya environment variable olarak eklemeniz gerekir:
+        ```bash
+        docker run -p 5000:5000 -v ${PWD}/output:/app/output --env-file .env renaissance-recon
+        ```
+        Veya spesifik olarak:
+        ```bash
+        docker run -p 5000:5000 -v ${PWD}/output:/app/output -e GEMINI_API_KEY='YOUR_API_KEY_HERE' renaissance-recon
+        ```
+
+3.  **Web Arayüzüne Erişin:**
+    Container başlatıldıktan sonra web tarayıcınızda `http://127.0.0.1:5000` adresine gidin.
+
 ## Kullanım
 
 1.  **Uygulamayı Başlatın:**

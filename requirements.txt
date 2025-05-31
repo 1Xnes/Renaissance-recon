@@ -18,7 +18,8 @@ colorama==0.4.4
 cffi # Often a dependency for other packages
 
 # Common dependency for HTTP requests (used by Flask, Sublist3r, SubDomainizer)
-requests==2.21.0 # Using version from SubDomainizer, ensure compatibility
+requests>=2.28.1,<3.0.0 # Updated to be compatible with google-genai
 # For Gemini API (we'll add this later, but good to have in mind)
+google.generativeai>=0.5.0
 google-genai>=0.5.0
 grpcio>=1.32.0 # Required for Google Gemini API

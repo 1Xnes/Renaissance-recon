@@ -3,6 +3,7 @@ import subprocess
 import json
 import threading
 import time
+import re # Import re for ANSI code stripping
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 from urllib.parse import quote_plus, unquote_plus, urlparse
@@ -37,6 +38,11 @@ if not os.path.exists('wordlists'):
 
 # Global dictionary to store scan statuses
 scan_statuses = {}
+
+def strip_ansi_codes(text):
+    """Removes ANSI escape codes from a string."""
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', text)
 
 def get_tool_path(tool_name_with_subdir):
     # Helper function to get the absolute path to a tool's executable script.
@@ -286,7 +292,7 @@ def show_results(scan_folder):
     sublist3r_stdout_content = ""
     try:
         with open(results_paths['sublist3r_stdout'], 'r', encoding='utf-8') as f:
-            sublist3r_stdout_content = f.read()
+            sublist3r_stdout_content = strip_ansi_codes(f.read())
         # Define the line that marks the end of Google enumeration in Sublist3r output
         google_enum_finished_line = "[*] Google search finished."
         if google_enum_finished_line in sublist3r_stdout_content:
@@ -310,7 +316,7 @@ def show_results(scan_folder):
     sublist3r_stderr_content = ""
     try:
         with open(results_paths['sublist3r_stderr'], 'r', encoding='utf-8') as f:
-            sublist3r_stderr_content = f.read()
+            sublist3r_stderr_content = strip_ansi_codes(f.read())
     except FileNotFoundError:
         sublist3r_stderr_content = "Sublist3r hata dosyası bulunamadı."
     except Exception as e:
@@ -321,7 +327,7 @@ def show_results(scan_folder):
     subdomainizer_cloudurls = []
     try:
         with open(results_paths['subdomainizer_stdout'], 'r', encoding='utf-8') as f:
-            subdomainizer_stdout_content = f.read()
+            subdomainizer_stdout_content = strip_ansi_codes(f.read())
             # Cloud URL'leri ayrıştır
             cloud_section = None
             lines = subdomainizer_stdout_content.splitlines()
@@ -344,7 +350,7 @@ def show_results(scan_folder):
     subdomainizer_stderr_content = ""
     try:
         with open(results_paths['subdomainizer_stderr'], 'r', encoding='utf-8') as f:
-            subdomainizer_stderr_content = f.read()
+            subdomainizer_stderr_content = strip_ansi_codes(f.read())
     except FileNotFoundError:
         subdomainizer_stderr_content = "SubDomainizer hata dosyası bulunamadı."
     except Exception as e:
@@ -384,7 +390,7 @@ def show_results(scan_folder):
     ffuf_stderr_content = ""
     try:
         with open(results_paths['ffuf_stderr'], 'r', encoding='utf-8') as f:
-            ffuf_stderr_content = f.read()
+            ffuf_stderr_content = strip_ansi_codes(f.read())
     except FileNotFoundError:
         ffuf_stderr_content = "FFUF konsol hata dosyası bulunamadı."
     except Exception as e:
@@ -552,6 +558,5 @@ def gemini_chat_handler():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    # Run the Flask development server
-    # Debug mode should be False in a production environment
-    app.run(debug=True)
+    # Sunucuyu tüm arayüzlerde (0.0.0.0) çalıştırın, böylece Docker container dışından erişilebilir olur.
+    app.run(debug=True, host='0.0.0.0', port=5000)
