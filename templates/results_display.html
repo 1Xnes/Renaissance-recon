@@ -299,6 +299,12 @@
                    class="inline-block bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 px-8 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-purple-500">
                     <i class="fas fa-arrow-left mr-2"></i>Yeni Tarama Başlat
                 </a>
+                {% if GEMINI_API_KEY_AVAILABLE %}
+                <a href="{{ url_for('ai_chat_page', scan_folder=scan_folder) }}"
+                   class="inline-block bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-semibold py-3 px-8 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-teal-500">
+                    <i class="fas fa-robot mr-2"></i>AI ile Tartış
+                </a>
+                {% endif %}
             </div>
             <p class="text-gray-500 mt-8 pb-4">&copy; 2025 Xnes. Tüm hakları saklıdır.</p>
         </footer>

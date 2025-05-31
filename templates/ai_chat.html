@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI ile Tartış - {{ target_url }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* gray-900 */
+            color: #f3f4f6; /* gray-100 */
+        }
+        .chat-container {
+            max-width: 800px;
+            margin: auto;
+            background-color: #1f2937; /* gray-800 */
+            border-radius: 0.75rem; /* rounded-xl */
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); /* shadow-2xl */
+        }
+        .chat-header {
+            background-color: #374151; /* gray-700 */
+            padding: 1.5rem; /* p-6 */
+            border-top-left-radius: 0.75rem;
+            border-top-right-radius: 0.75rem;
+            border-bottom: 1px solid #4b5563; /* gray-600 */
+        }
+        .chat-messages {
+            height: 60vh;
+            overflow-y: auto;
+            padding: 1.5rem; /* p-6 */
+            display: flex;
+            flex-direction: column;
+            gap: 1rem; /* space-y-4 */
+        }
+        .message {
+            padding: 0.75rem 1rem; /* px-4 py-3 */
+            border-radius: 0.5rem; /* rounded-lg */
+            max-width: 80%;
+            line-height: 1.6;
+        }
+        .user-message {
+            background-color: #4f46e5; /* indigo-600 */
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 0;
+        }
+        .ai-message {
+            background-color: #374151; /* gray-700 */
+            color: #d1d5db; /* gray-300 */
+            align-self: flex-start;
+            border-bottom-left-radius: 0;
+        }
+        .ai-message pre {
+            background-color: #111827; /* gray-900 */
+            padding: 0.75rem;
+            border-radius: 0.25rem;
+            overflow-x: auto;
+            margin-top: 0.5rem;
+            margin-bottom: 0.25rem;
+            font-size: 0.875rem; /* text-sm */
+        }
+        .chat-input {
+            padding: 1.5rem; /* p-6 */
+            border-top: 1px solid #4b5563; /* gray-600 */
+        }
+        .chat-input textarea {
+            background-color: #374151; /* gray-700 */
+            border: 1px solid #4b5563; /* gray-600 */
+            color: #f3f4f6; /* gray-100 */
+            resize: none;
+        }
+        .chat-input textarea:focus {
+            border-color: #805ad5; /* purple-500 */
+            box-shadow: 0 0 0 2px rgba(128, 90, 213, 0.5);
+            outline: none;
+        }
+        .btn-send {
+            background-color: #805ad5; /* purple-600 */
+            transition: background-color 0.2s;
+        }
+        .btn-send:hover {
+            background-color: #6b46c1; /* purple-700 */
+        }
+        /* Custom scrollbar for chat messages */
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+        .chat-messages::-webkit-scrollbar-track {
+            background: #1f2937; /* gray-800 */
+        }
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #4b5563; /* gray-600 */
+            border-radius: 4px;
+        }
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; /* gray-500 */
+        }
+        .markdown-content p {
+            margin-bottom: 0.5rem;
+        }
+        .markdown-content ul, .markdown-content ol {
+            margin-left: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .markdown-content li {
+            margin-bottom: 0.25rem;
+        }
+        .markdown-content code {
+            background-color: #111827;
+            padding: 0.1rem 0.3rem;
+            border-radius: 0.25rem;
+            font-family: 'Courier New', Courier, monospace;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="chat-container w-full">
+        <header class="chat-header flex justify-between items-center">
+            <div>
+                <h1 class="text-xl md:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">
+                    <i class="fas fa-robot mr-2"></i>AI ile Tartış
+                </h1>
+                <p class="text-sm text-gray-400 mt-1">Hedef: {{ target_url }}</p>
+                <p class="text-xs text-purple-300 mt-1"><i class="fas fa-check-circle mr-1"></i>Test Sonuçları AI için yüklendi.</p>
+            </div>
+            <a href="{{ url_for('show_results', scan_folder=scan_folder) }}" 
+               class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 text-sm">
+                <i class="fas fa-arrow-left mr-1"></i> Sonuçlara Dön
+            </a>
+        </header>
+
+        <div id="chat-messages" class="chat-messages">
+            <!-- AI's initial context/message will be added here by script -->
+        </div>
+
+        <div class="chat-input flex items-center gap-3">
+            <textarea id="user-message-input" 
+                      class="w-full px-4 py-3 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none placeholder-gray-500" 
+                      placeholder="Mesajınızı yazın..." rows="2"></textarea>
+            <button id="send-button" 
+                    class="btn-send text-white font-semibold py-3 px-5 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-purple-500">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+
+    <textarea id="initial-context" class="hidden">{{ initial_context }}</textarea>
+
+    <script>
+        const chatMessagesDiv = document.getElementById('chat-messages');
+        const userMessageInput = document.getElementById('user-message-input');
+        const sendButton = document.getElementById('send-button');
+        const initialContextTextarea = document.getElementById('initial-context');
+        
+        let chatHistory = []; // To store conversation history for Gemini API
+
+        function appendMessage(text, sender, isMarkdown = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', sender === 'user' ? 'user-message' : 'ai-message');
+            
+            if (isMarkdown && sender === 'ai') {
+                // Sanitize and render markdown
+                // Ensure `marked` is loaded if you use it client-side for complex markdown
+                // For simple cases or if `marked` isn't used, direct textContent is safer
+                const renderedHtml = marked.parse(text);
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = renderedHtml;
+                
+                // Add styling to pre and code blocks
+                tempDiv.querySelectorAll('pre').forEach(pre => {
+                    pre.classList.add('bg-gray-900', 'p-3', 'rounded-md', 'overflow-x-auto', 'text-sm', 'my-2', 'custom-scrollbar');
+                });
+                 tempDiv.querySelectorAll('code:not(pre code)').forEach(code => {
+                    code.classList.add('bg-gray-900', 'px-1', 'py-0.5', 'rounded', 'font-mono', 'text-pink-400');
+                });
+                tempDiv.querySelectorAll('ul, ol').forEach(list => {
+                    list.classList.add('list-disc', 'list-inside', 'pl-4', 'my-1');
+                });
+
+
+                messageDiv.innerHTML = tempDiv.innerHTML;
+            } else {
+                // For user messages or non-markdown AI messages, just set text content
+                const pre = document.createElement('pre');
+                pre.style.whiteSpace = 'pre-wrap'; // Ensure text wraps
+                pre.style.wordWrap = 'break-word'; // Ensure long words break
+                pre.textContent = text;
+                messageDiv.appendChild(pre);
+            }
+            
+            chatMessagesDiv.appendChild(messageDiv);
+            chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight; // Scroll to bottom
+        }
+
+        function showTypingIndicator(show) {
+            let typingDiv = document.getElementById('typing-indicator');
+            if (show) {
+                if (!typingDiv) {
+                    typingDiv = document.createElement('div');
+                    typingDiv.id = 'typing-indicator';
+                    typingDiv.classList.add('message', 'ai-message');
+                    typingDiv.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> AI yazıyor...';
+                    chatMessagesDiv.appendChild(typingDiv);
+                    chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+                }
+            } else {
+                if (typingDiv) {
+                    typingDiv.remove();
+                }
+            }
+        }
+
+        async function sendMessageToAI(message) {
+            // Add user message to UI and history
+            appendMessage(message, 'user');
+            chatHistory.push({ role: 'user', parts: [message] });
+            
+            userMessageInput.value = ''; // Clear input
+            userMessageInput.disabled = true;
+            sendButton.disabled = true;
+            showTypingIndicator(true);
+
+            try {
+                const response = await fetch('{{ url_for("gemini_chat_handler") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message, history: chatHistory }),
+                });
+
+                showTypingIndicator(false);
+                userMessageInput.disabled = false;
+                sendButton.disabled = false;
+                userMessageInput.focus();
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    appendMessage(`Hata: ${errorData.error || response.statusText}`, 'ai');
+                    chatHistory.push({ role: 'model', parts: [`Hata: ${errorData.error || response.statusText}`]});
+                    return;
+                }
+
+                const data = await response.json();
+                appendMessage(data.reply, 'ai', true); // AI response might be markdown
+                chatHistory.push({ role: 'model', parts: [data.reply] });
+
+            } catch (error) {
+                showTypingIndicator(false);
+                userMessageInput.disabled = false;
+                sendButton.disabled = false;
+                appendMessage(`İstek gönderilirken bir hata oluştu: ${error.message}`, 'ai');
+                chatHistory.push({ role: 'model', parts: [`İstek gönderilirken bir hata oluştu: ${error.message}`]});
+            }
+        }
+
+        sendButton.addEventListener('click', () => {
+            const message = userMessageInput.value.trim();
+            if (message) {
+                sendMessageToAI(message);
+            }
+        });
+
+        userMessageInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault(); // Prevent new line
+                const message = userMessageInput.value.trim();
+                if (message) {
+                    sendMessageToAI(message);
+                }
+            }
+        });
+
+        // Initialize chat with the initial context from the AI (as if AI said it first)
+        document.addEventListener('DOMContentLoaded', () => {
+            const initialContext = initialContextTextarea.value;
+            if (initialContext) {
+                // Display a generic greeting from the AI instead of the full context
+                appendMessage("Merhaba! Tarama sonuçlarınız arka planda yüklendi. Bu sonuçlar üzerinden sorularınızı sorabilirsiniz. Nasıl yardımcı olabilirim?", 'ai');
+
+                // Add the initial scan context to the history for the AI to use, but don't display it directly.
+                // The AI's prompt (set in app.py) already instructs it that it *has* this data.
+                chatHistory.push({role: 'user', parts: [initialContext]}); 
+                // Optionally, you could add a model part here to simulate AI processing it, e.g.:
+                // chatHistory.push({role: 'model', parts: ["Scan results received and processed. Ready for your questions."]});
+            }
+            userMessageInput.focus();
+        });
+
+    </script>
+</body>
+</html> 

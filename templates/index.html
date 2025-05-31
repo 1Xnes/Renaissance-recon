@@ -133,9 +133,18 @@
                        class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none placeholder-gray-500"
                        placeholder="varsayılan: wordlists/common_small.txt">
                 <p class="mt-1 text-xs text-gray-500">Eğer boş bırakılırsa 'wordlists/common_small.txt' kullanılır.</p>
-                <div id="ffuf-warning" class="hidden mt-2 p-2 bg-yellow-900/50 border border-yellow-700 rounded text-yellow-300 text-xs">
-                    <i class="fas fa-exclamation-triangle mr-1"></i>
-                    <strong>Uyarı:</strong> Büyük kelime listeleri kullanırken tarama 30 dakikaya kadar sürebilir. Daha küçük kelime listeleri kullanmanız önerilir.
+                <div id="ffuf-options-container" class="mt-2 space-y-2">
+                    <div id="ffuf-warning" class="hidden p-2 bg-yellow-900/50 border border-yellow-700 rounded text-yellow-300 text-xs">
+                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                        <strong>Uyarı:</strong> Büyük kelime listeleri kullanırken tarama 30 dakikaya kadar sürebilir. Daha küçük kelime listeleri kullanmanız önerilir.
+                    </div>
+                    <div class="flex items-center tool-card bg-gray-750 p-3 rounded-md border border-gray-600 hover:border-purple-500">
+                        <input id="analyze_js_for_ai" name="analyze_js_for_ai" type="checkbox"
+                               class="custom-checkbox">
+                        <label for="analyze_js_for_ai" class="ml-3 block text-sm font-medium text-gray-300 cursor-pointer">
+                            AI için JS Analizi <span class="text-xs text-gray-500">(FFUF ile bulunan JS dosyalarını AI bağlamına ekle)</span>
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -158,18 +167,26 @@
             const ffufCheckbox = document.getElementById('run_ffuf');
             const ffufWarning = document.getElementById('ffuf-warning');
             const wordlistInput = document.getElementById('wordlist');
+            const analyzeJsCheckbox = document.getElementById('analyze_js_for_ai');
+            const ffufOptionsContainer = document.getElementById('ffuf-options-container');
 
-            function toggleWarning() {
+
+            function toggleWarningAndJsOption() {
                 if (ffufCheckbox.checked) {
                     ffufWarning.classList.remove('hidden');
+                    // Show analyze_js_for_ai option only if FFUF is checked
+                    analyzeJsCheckbox.closest('.tool-card').style.display = 'flex'; 
                 } else {
                     ffufWarning.classList.add('hidden');
+                    // Hide and uncheck analyze_js_for_ai if FFUF is unchecked
+                    analyzeJsCheckbox.closest('.tool-card').style.display = 'none';
+                    analyzeJsCheckbox.checked = false; 
                 }
             }
 
-            ffufCheckbox.addEventListener('change', toggleWarning);
+            ffufCheckbox.addEventListener('change', toggleWarningAndJsOption);
             // Initial check
-            toggleWarning();
+            toggleWarningAndJsOption();
         });
     </script>
 

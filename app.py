@@ -6,8 +6,19 @@ import time
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 from urllib.parse import quote_plus, unquote_plus, urlparse
+import requests # For fetching JS files
+import google.generativeai as genai # For Gemini API
+from dotenv import load_dotenv # To load .env file
+
+load_dotenv() # Load environment variables from .env
 
 app = Flask(__name__)
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+else:
+    print("UYARI: GEMINI_API_KEY .env dosyasında bulunamadı. AI Chat özelliği çalışmayabilir.")
 
 # Ensure output directory exists
 # Create 'output' directory if it doesn't exist to store scan results
@@ -49,6 +60,15 @@ def update_scan_status(scan_folder, tool_name, status, message=""):
     }
     # Print to terminal
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {scan_folder} - {tool_name}: {status} {message}")
+
+def fetch_js_content(url):
+    """Fetches the content of a JS file from a URL."""
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status() # Raise an exception for HTTP errors
+        return response.text
+    except requests.RequestException as e:
+        return f"Error fetching {url}: {str(e)}"
 
 def run_command(command, output_file_base_for_logs, tool_name, scan_folder):
     # Runs a command and captures its stdout and stderr, saving them to files.
@@ -182,6 +202,7 @@ def index():
         if request.form.get('run_ffuf'):
             selected_tools.append('ffuf')
         # Araçları virgül ile birleştirip parametre olarak ilet
+        analyze_js_for_ai = bool(request.form.get('analyze_js_for_ai'))
         tools_param = ','.join(selected_tools)
         scan_folder_name = f"arama{len(recent_scans)+1}_{sanitize_filename(unquote_plus(target_url))}"
         scan_folder_path = os.path.join(output_dir, scan_folder_name)
@@ -200,7 +221,7 @@ def index():
             ffuf_wordlist = request.form.get('wordlist', '').strip()
             if not ffuf_wordlist:
                 ffuf_wordlist = get_wordlist_path('common_small.txt')
-            scan_log.append({'folder': scan_folder_name, 'target': target_url, 'tools': selected_tools, 'ffuf_wordlist': ffuf_wordlist})
+            scan_log.append({'folder': scan_folder_name, 'target': target_url, 'tools': selected_tools, 'ffuf_wordlist': ffuf_wordlist, 'analyze_js_for_ai': analyze_js_for_ai})
         with open(scan_log_file, 'w', encoding='utf-8') as f:
             json.dump(scan_log, f, ensure_ascii=False, indent=2)
         
@@ -239,6 +260,7 @@ def show_results(scan_folder):
     scan_log_file = os.path.join(output_base, 'scan_log.json')
     decoded_target_url = scan_folder
     tools_run = ['sublist3r', 'subdomainizer', 'ffuf']  # Varsayılan, eğer scan_log yoksa hepsi gösterilsin
+    analyze_js_for_ai_enabled = False # Default value
     if os.path.exists(scan_log_file):
         import json
         with open(scan_log_file, 'r', encoding='utf-8') as f:
@@ -247,6 +269,7 @@ def show_results(scan_folder):
             if entry['folder'] == scan_folder:
                 decoded_target_url = entry['target']
                 tools_run = entry.get('tools', tools_run)
+                analyze_js_for_ai_enabled = entry.get('analyze_js_for_ai', False) # Get the value
                 break
     results_paths = {
         'target': decoded_target_url,
@@ -372,7 +395,126 @@ def show_results(scan_folder):
                            ffuf_json_raw=ffuf_json_content_raw, 
                            ffuf_stderr=ffuf_stderr_content,
                            tools_run=tools_run,
-                           scan_folder=scan_folder)
+                           scan_folder=scan_folder,
+                           analyze_js_for_ai_enabled=analyze_js_for_ai_enabled,
+                           GEMINI_API_KEY_AVAILABLE=bool(GEMINI_API_KEY))
+
+@app.route('/ai_chat/<scan_folder>', methods=['GET'])
+def ai_chat_page(scan_folder):
+    output_base = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output')
+    scan_folder_path = os.path.join(output_base, scan_folder)
+    scan_log_file = os.path.join(output_base, 'scan_log.json')
+
+    target_url = ""
+    tools_run_for_scan = []
+    analyze_js = False
+    if os.path.exists(scan_log_file):
+        with open(scan_log_file, 'r', encoding='utf-8') as f:
+            scan_log = json.load(f)
+        for entry in scan_log:
+            if entry['folder'] == scan_folder:
+                target_url = entry['target']
+                tools_run_for_scan = entry.get('tools', [])
+                analyze_js = entry.get('analyze_js_for_ai', False)
+                break
+    
+    if not target_url:
+        return "Tarama bilgisi bulunamadı.", 404
+
+    # Base context for AI
+    ai_initial_context = "You are a Cyber Security Tool. Below you will have some sublist3r, subdomainizer and ffuf results, and potentially JavaScript file contents. You should give ideas and probabilities based on that and chat with the user. Respond in language user talks.\n\n"
+    ai_initial_context += f"Scan Target: {target_url}\n\n"
+
+    # --- Gather data for AI context ---
+    data_for_ai = {"target": target_url}
+
+    # Sublist3r
+    if 'sublist3r' in tools_run_for_scan:
+        sublist3r_stdout_path = os.path.join(scan_folder_path, "sublist3r_sublist3r_stdout.txt")
+        if os.path.exists(sublist3r_stdout_path):
+            with open(sublist3r_stdout_path, 'r', encoding='utf-8') as f:
+                data_for_ai['sublist3r_stdout'] = f.read()
+        else:
+            data_for_ai['sublist3r_stdout'] = "Sublist3r output not found."
+        ai_initial_context += "--- Sublist3r Output ---\n" + data_for_ai['sublist3r_stdout'] + "\n\n"
+
+    # SubDomainizer
+    if 'subdomainizer' in tools_run_for_scan:
+        subdomainizer_stdout_path = os.path.join(scan_folder_path, "subdomainizer_subdomainizer_stdout.txt")
+        if os.path.exists(subdomainizer_stdout_path):
+            with open(subdomainizer_stdout_path, 'r', encoding='utf-8') as f:
+                data_for_ai['subdomainizer_stdout'] = f.read()
+        else:
+            data_for_ai['subdomainizer_stdout'] = "SubDomainizer output not found."
+        ai_initial_context += "--- SubDomainizer Output ---\n" + data_for_ai['subdomainizer_stdout'] + "\n\n"
+    
+    # FFUF
+    ffuf_results_for_ai = "FFUF scan was not run or results are not available."
+    if 'ffuf' in tools_run_for_scan:
+        ffuf_json_path = os.path.join(scan_folder_path, f"{scan_folder}_ffuf.json")
+        if os.path.exists(ffuf_json_path):
+            try:
+                with open(ffuf_json_path, 'r', encoding='utf-8') as f:
+                    ffuf_data_raw = f.read()
+                    ffuf_data = json.loads(ffuf_data_raw)
+                    data_for_ai['ffuf_results'] = ffuf_data.get('results', [])
+                    ffuf_results_for_ai = "--- FFUF Results ---\n"
+                    if data_for_ai['ffuf_results']:
+                        for res in data_for_ai['ffuf_results']:
+                            ffuf_results_for_ai += f"- URL: {res.get('url')}, Status: {res.get('status')}, Length: {res.get('length')}\n"
+                    else:
+                        ffuf_results_for_ai += "No paths found by FFUF or results were filtered out.\n"
+                    
+                    if analyze_js:
+                        js_files_content = "\n--- JavaScript Files Content (from FFUF) ---\n"
+                        found_js = False
+                        for res in data_for_ai.get('ffuf_results', []):
+                            url = res.get('url')
+                            if url and url.endswith('.js'):
+                                found_js = True
+                                js_content = fetch_js_content(url)
+                                js_files_content += f"--- Content of {url} ---\n{js_content}\n\n"
+                        if found_js:
+                             ffuf_results_for_ai += js_files_content
+                        else:
+                            ffuf_results_for_ai += "No .js files found in FFUF results or JS analysis was not enabled for AI.\n"
+            except Exception as e:
+                ffuf_results_for_ai = f"--- FFUF Results ---\nError processing FFUF results: {str(e)}\n"
+        else:
+            ffuf_results_for_ai = "--- FFUF Results ---\nFFUF JSON output file not found.\n"
+    ai_initial_context += ffuf_results_for_ai + "\n"
+    
+    return render_template('ai_chat.html', scan_folder=scan_folder, initial_context=ai_initial_context, target_url=target_url)
+
+@app.route('/gemini_chat', methods=['POST'])
+def gemini_chat_handler():
+    if not GEMINI_API_KEY:
+        return jsonify({"error": "Gemini API key not configured."}), 500
+
+    data = request.json
+    user_message = data.get('message')
+    history_raw = data.get('history', []) # Expecting [{'role': 'user'/'model', 'parts': ['text']}]
+
+    if not user_message:
+        return jsonify({"error": "No message provided."}), 400
+
+    try:
+        model = genai.GenerativeModel('gemini-2.5-flash-preview-05-20')
+        
+        # Construct history for the API
+        chat_history = []
+        for entry in history_raw:
+            role = entry.get('role')
+            parts = entry.get('parts')
+            if role and parts:
+                 chat_history.append({'role': role, 'parts': parts})
+        
+        chat = model.start_chat(history=chat_history)
+        response = chat.send_message(user_message)
+        
+        return jsonify({"reply": response.text})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     # Run the Flask development server
