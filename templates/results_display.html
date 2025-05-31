@@ -288,6 +288,52 @@
                 </details>
             </div>
             {% endif %}
+
+            {% if 'ffuf' in tools_run and ffuf_js_files and ffuf_js_files|length > 0 %}
+            <div class="result-section bg-gray-700/50 p-5 md:p-6 rounded-lg shadow-lg">
+                <details class="bg-gray-700 rounded-md shadow-inner" open>
+                    <summary class="cursor-pointer p-3 font-medium text-gray-300 hover:bg-gray-600/70 rounded-t-md">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-xl md:text-2xl font-semibold text-gray-200 inline-flex items-center">
+                                <i class="fab fa-js-square mr-2 text-yellow-400"></i>FFUF ile Bulunan JS Dosyaları
+                            </h2>
+                            <button onclick="event.stopPropagation(); downloadFFUFJSFiles()" class="bg-yellow-500 hover:bg-yellow-600 text-gray-900 px-4 py-2 rounded-lg transition-colors duration-200">
+                                <i class="fas fa-download mr-2"></i>JS Listesini İndir
+                            </button>
+                        </div>
+                    </summary>
+                    <div class="p-3 border-t border-gray-600">
+                        <div class="overflow-x-auto rounded-md shadow">
+                            <table class="w-full text-sm text-left text-gray-300 bg-gray-800">
+                                <thead class="text-xs text-gray-200 uppercase bg-gray-700">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3">JS Dosya URL</th>
+                                        <th scope="col" class="px-6 py-3">İçerik Önizleme</th> 
+                                    </tr>
+                                </thead>
+                                <tbody id="ffuf-js-files-body" data-js-files='{{ ffuf_js_files|tojson|safe if ffuf_js_files else "[]" }}'>
+                                    <!-- JS files will be loaded here by script -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="ffuf-js-pagination" class="mt-4 flex justify-between items-center">
+                            <div class="text-sm text-gray-400">
+                                Toplam <span id="ffuf-js-total-count">0</span> JS dosyası
+                            </div>
+                            <div class="flex space-x-2">
+                                <button id="ffuf-js-prev-page" class="px-3 py-1 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <i class="fas fa-chevron-left"></i> Önceki
+                                </button>
+                                <span id="ffuf-js-page-info" class="px-3 py-1 text-gray-300">Sayfa 1</span>
+                                <button id="ffuf-js-next-page" class="px-3 py-1 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    Sonraki <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+            </div>
+            {% endif %}
             </main>
 
         <footer class="mt-12 text-center">
@@ -392,6 +438,25 @@
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
             });
+        }
+
+        function downloadFFUFJSFiles() {
+            const jsFiles = JSON.parse(document.getElementById('ffuf-js-files-body').dataset.jsFiles || '[]');
+            if (jsFiles.length === 0) {
+                alert('İndirilecek JS dosyası bulunamadı.');
+                return;
+            }
+            const content = jsFiles.join('\n');
+            const filename = 'ffuf_found_js_files.txt';
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
         }
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -625,6 +690,127 @@
             // Initial load of FFUF results
             if (document.getElementById('ffuf-results-body')) {
                 loadFFUFResults();
+            }
+
+            // --- FFUF JS Files Pagination and Display Logic ---
+            let currentJsPage = 1;
+            const JS_FILES_PER_PAGE = 20;
+            let ffufJsFilesData = [];
+
+            function loadFFUFJsFiles() {
+                const jsFilesFromBody = JSON.parse(document.getElementById('ffuf-js-files-body').dataset.jsFiles || '[]');
+                ffufJsFilesData = jsFilesFromBody;
+                const totalJsPages = Math.ceil(ffufJsFilesData.length / JS_FILES_PER_PAGE);
+
+                document.getElementById('ffuf-js-total-count').textContent = ffufJsFilesData.length;
+                document.getElementById('ffuf-js-prev-page').disabled = currentJsPage === 1;
+                document.getElementById('ffuf-js-next-page').disabled = currentJsPage === totalJsPages || ffufJsFilesData.length === 0;
+                document.getElementById('ffuf-js-page-info').textContent = ffufJsFilesData.length > 0 ? `Sayfa ${currentJsPage} / ${totalJsPages}` : 'Sayfa 0 / 0';
+
+                const start = (currentJsPage - 1) * JS_FILES_PER_PAGE;
+                const end = start + JS_FILES_PER_PAGE;
+                const pageJsFiles = ffufJsFilesData.slice(start, end);
+
+                const tbody = document.getElementById('ffuf-js-files-body');
+                tbody.innerHTML = pageJsFiles.map((jsFileUrl, index) => `
+                    <tr class="bg-gray-800 border-b border-gray-700 hover:bg-gray-700/70">
+                        <td class="px-6 py-4 font-medium whitespace-nowrap">
+                            <a href="${jsFileUrl}" target="_blank" rel="noopener noreferrer" class="text-purple-400 hover:underline">${jsFileUrl}</a>
+                        </td>
+                        <td class="px-6 py-4">
+                            <button onclick="showJsContentModal('${jsFileUrl}', ${start + index})" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs">
+                                <i class="fas fa-eye mr-1"></i>İçeriği Göster
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            if (document.getElementById('ffuf-js-files-body')) {
+                loadFFUFJsFiles();
+            }
+
+            document.getElementById('ffuf-js-prev-page')?.addEventListener('click', () => {
+                if (currentJsPage > 1) {
+                    currentJsPage--;
+                    loadFFUFJsFiles();
+                }
+            });
+
+            document.getElementById('ffuf-js-next-page')?.addEventListener('click', () => {
+                const totalJsPages = Math.ceil(ffufJsFilesData.length / JS_FILES_PER_PAGE);
+                if (currentJsPage < totalJsPages) {
+                    currentJsPage++;
+                    loadFFUFJsFiles();
+                }
+            });
+
+            // Modal for JS Content
+            const modalHTML = `
+                <div id="js-content-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
+                    <div class="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-3xl max-h-[80vh] flex flex-col">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold text-gray-200 truncate" id="js-modal-title">JS Dosya İçeriği</h3>
+                            <button onclick="closeJsContentModal()" class="text-gray-400 hover:text-gray-200">
+                                <i class="fas fa-times fa-lg"></i>
+                            </button>
+                        </div>
+                        <div class="overflow-y-auto flex-grow custom-scrollbar pr-2">
+                            <pre id="js-modal-content" class="bg-gray-900 p-4 rounded text-sm text-gray-300 whitespace-pre-wrap break-all"></pre>
+                        </div>
+                        <div class="mt-4 text-right">
+                            <button onclick="copyJsContentToClipboard()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md mr-2">
+                                <i class="fas fa-copy mr-1"></i> Kopyala
+                            </button>
+                            <button onclick="closeJsContentModal()" class="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-md">
+                                Kapat
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+            window.showJsContentModal = async function(jsFileUrl, originalIndex) {
+                const modal = document.getElementById('js-content-modal');
+                const titleEl = document.getElementById('js-modal-title');
+                const contentEl = document.getElementById('js-modal-content');
+                
+                titleEl.textContent = jsFileUrl;
+                contentEl.textContent = 'Yükleniyor...';
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden'; // Prevent background scrolling
+
+                try {
+                    const response = await fetch(`{{ url_for('fetch_external_js') }}?url=${encodeURIComponent(jsFileUrl)}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    if(data.error) {
+                        contentEl.textContent = `İçerik alınamadı: ${data.error}`;
+                    } else {
+                        contentEl.textContent = data.content || 'İçerik boş veya alınamadı.';
+                    }
+                } catch (error) {
+                    console.error('Error fetching JS content:', error);
+                    contentEl.textContent = `İçerik yüklenirken hata oluştu: ${error.message}`;
+                }
+            }
+
+            window.closeJsContentModal = function() {
+                const modal = document.getElementById('js-content-modal');
+                modal.classList.add('hidden');
+                document.body.style.overflow = 'auto';
+            }
+
+            window.copyJsContentToClipboard = function() {
+                const contentEl = document.getElementById('js-modal-content');
+                navigator.clipboard.writeText(contentEl.textContent).then(() => {
+                    alert('İçerik panoya kopyalandı!');
+                }).catch(err => {
+                    alert('Kopyalanamadı: ' + err);
+                });
             }
         });
     </script>

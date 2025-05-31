@@ -202,7 +202,6 @@ def index():
         if request.form.get('run_ffuf'):
             selected_tools.append('ffuf')
         # Araçları virgül ile birleştirip parametre olarak ilet
-        analyze_js_for_ai = bool(request.form.get('analyze_js_for_ai'))
         tools_param = ','.join(selected_tools)
         scan_folder_name = f"arama{len(recent_scans)+1}_{sanitize_filename(unquote_plus(target_url))}"
         scan_folder_path = os.path.join(output_dir, scan_folder_name)
@@ -221,7 +220,7 @@ def index():
             ffuf_wordlist = request.form.get('wordlist', '').strip()
             if not ffuf_wordlist:
                 ffuf_wordlist = get_wordlist_path('common_small.txt')
-            scan_log.append({'folder': scan_folder_name, 'target': target_url, 'tools': selected_tools, 'ffuf_wordlist': ffuf_wordlist, 'analyze_js_for_ai': analyze_js_for_ai})
+            scan_log.append({'folder': scan_folder_name, 'target': target_url, 'tools': selected_tools, 'ffuf_wordlist': ffuf_wordlist})
         with open(scan_log_file, 'w', encoding='utf-8') as f:
             json.dump(scan_log, f, ensure_ascii=False, indent=2)
         
@@ -258,21 +257,23 @@ def show_results(scan_folder):
     scan_folder_path = os.path.join(output_base, scan_folder)
     # scan_log.json'dan hedefi bul
     scan_log_file = os.path.join(output_base, 'scan_log.json')
-    decoded_target_url = scan_folder
-    tools_run = ['sublist3r', 'subdomainizer', 'ffuf']  # Varsayılan, eğer scan_log yoksa hepsi gösterilsin
-    analyze_js_for_ai_enabled = False # Default value
+    target_info = {}
+    tools_run = []
+    ffuf_wordlist_used = ""
+
     if os.path.exists(scan_log_file):
-        import json
         with open(scan_log_file, 'r', encoding='utf-8') as f:
             scan_log = json.load(f)
         for entry in scan_log:
             if entry['folder'] == scan_folder:
-                decoded_target_url = entry['target']
-                tools_run = entry.get('tools', tools_run)
-                analyze_js_for_ai_enabled = entry.get('analyze_js_for_ai', False) # Get the value
+                target_info = entry
+                tools_run = entry.get('tools', [])
+                ffuf_wordlist_used = entry.get('ffuf_wordlist', get_wordlist_path('common_small.txt'))
                 break
+    
+    target_url = target_info.get('target', scan_folder) # Fallback to scan_folder if target not in log
     results_paths = {
-        'target': decoded_target_url,
+        'target': target_url,
         'sublist3r_stdout': os.path.join(scan_folder_path, "sublist3r_sublist3r_stdout.txt"),
         'sublist3r_stderr': os.path.join(scan_folder_path, "sublist3r_sublist3r_stderr.txt"),
         'subdomainizer_stdout': os.path.join(scan_folder_path, "subdomainizer_subdomainizer_stdout.txt"),
@@ -350,29 +351,35 @@ def show_results(scan_folder):
         subdomainizer_stderr_content = f"SubDomainizer hata günlükleri okunurken bir hata oluştu: {str(e)}"
 
     # --- Read FFUF Output ---
-    ffuf_json_content_parsed = None # For parsed JSON data (list of results)
-    ffuf_json_content_raw = ""    # For raw JSON string (fallback or for display)
+    ffuf_json_raw = None
+    ffuf_json_parsed = None # None means still processing or no data, [] means processed but empty
+    ffuf_js_files = []
     try:
-        with open(results_paths['ffuf_json'], 'r', encoding='utf-8') as f:
-            ffuf_json_content_raw = f.read() 
-            if ffuf_json_content_raw.strip(): # Proceed if file is not empty
-                data = json.loads(ffuf_json_content_raw)
-                # FFUF JSON structure has a 'results' key which is a list of findings.
-                ffuf_json_content_parsed = data.get('results', []) 
-            else: # File is empty or only whitespace
-                ffuf_json_content_parsed = [] # Treat as no results
-                ffuf_json_content_raw = "{}" # Represent empty JSON for raw display
-    except FileNotFoundError:
-        ffuf_json_content_raw = "FFUF JSON sonuç dosyası bulunamadı."
-        ffuf_json_content_parsed = [] # Pass empty list to template to avoid errors if file not found
-    except json.JSONDecodeError:
-        # If JSON parsing fails, ffuf_json_content_parsed remains None.
-        # The raw content (ffuf_json_content_raw) will be shown in the template.
-        # No need to set ffuf_json_content_raw again, it's already read.
-        ffuf_json_content_parsed = None 
+        # Check if ffuf output file exists and is not empty
+        if os.path.exists(results_paths['ffuf_json']) and os.path.getsize(results_paths['ffuf_json']) > 0:
+            with open(results_paths['ffuf_json'], 'r', encoding='utf-8') as f:
+                ffuf_json_raw = f.read()
+                try:
+                    ffuf_data = json.loads(ffuf_json_raw)
+                    ffuf_json_parsed = ffuf_data.get('results', [])
+                    # FFUF ile bulunan JS dosyalarını ayıkla
+                    for result in ffuf_json_parsed:
+                        if result.get('url', '').endswith('.js'):
+                            ffuf_js_files.append(result.get('url'))
+                except json.JSONDecodeError:
+                    ffuf_json_parsed = [] # Mark as processed but failed to parse
+                    print(f"Error decoding FFUF JSON: {results_paths['ffuf_json']}")
+        else:
+            # Dosya yoksa veya boşsa, tarama devam ediyor veya FFUF hiç çalıştırılmamış olabilir.
+            # Eğer FFUF'un durumu "Tamamlandı" veya "Hata" ise ve dosya hala yoksa, o zaman gerçekten sonuç yoktur.
+            current_ffuf_status = scan_statuses.get(scan_folder, {}).get('ffuf', {}).get('status')
+            if current_ffuf_status in ["Tamamlandı", "Hata", "Zaman Aşımı"]:
+                ffuf_json_parsed = [] # FFUF tamamlandı ama dosya yok/boş = sonuç yok
+            # else: ffuf_json_parsed None olarak kalır (devam ediyor)
+
     except Exception as e:
-        ffuf_json_content_raw = f"FFUF JSON okunurken bir hata oluştu: {str(e)}"
-        ffuf_json_content_parsed = [] # Pass empty list on other errors
+        print(f"Error reading or processing FFUF output {results_paths['ffuf_json']}: {e}")
+        ffuf_json_parsed = [] # Hata durumunda işlenmiş ama boş olarak işaretle
 
     ffuf_stderr_content = ""
     try:
@@ -385,19 +392,38 @@ def show_results(scan_folder):
 
     # Render the results template with all collected data
     return render_template('results_display.html',
-                           target=decoded_target_url,
+                           target=target_url,
                            sublist3r_stdout=sublist3r_stdout_content,
                            sublist3r_stderr=sublist3r_stderr_content,
                            subdomainizer_stdout=subdomainizer_stdout_content,
                            subdomainizer_stderr=subdomainizer_stderr_content,
                            subdomainizer_cloudurls=subdomainizer_cloudurls,
-                           ffuf_json_parsed=ffuf_json_content_parsed, 
-                           ffuf_json_raw=ffuf_json_content_raw, 
+                           ffuf_json_raw=ffuf_json_raw,
+                           ffuf_json_parsed=ffuf_json_parsed,
                            ffuf_stderr=ffuf_stderr_content,
+                           ffuf_js_files=ffuf_js_files,
                            tools_run=tools_run,
                            scan_folder=scan_folder,
-                           analyze_js_for_ai_enabled=analyze_js_for_ai_enabled,
                            GEMINI_API_KEY_AVAILABLE=bool(GEMINI_API_KEY))
+
+@app.route('/fetch_external_js')
+def fetch_external_js():
+    url = request.args.get('url')
+    if not url:
+        return jsonify({"error": "URL parametresi eksik."}), 400
+    
+    # Güvenlik için basit bir kontrol: Sadece http ve https protokollerine izin ver
+    parsed_url = urlparse(url)
+    if parsed_url.scheme not in ['http', 'https']:
+        return jsonify({"error": "Geçersiz URL şeması."}), 400
+
+    try:
+        content = fetch_js_content(url) # fetch_js_content zaten requests kullanıyor
+        if content.startswith("Error fetching"):
+             return jsonify({"error": content}), 500
+        return jsonify({"content": content})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/ai_chat/<scan_folder>', methods=['GET'])
 def ai_chat_page(scan_folder):
@@ -407,7 +433,6 @@ def ai_chat_page(scan_folder):
 
     target_url = ""
     tools_run_for_scan = []
-    analyze_js = False
     if os.path.exists(scan_log_file):
         with open(scan_log_file, 'r', encoding='utf-8') as f:
             scan_log = json.load(f)
@@ -415,14 +440,13 @@ def ai_chat_page(scan_folder):
             if entry['folder'] == scan_folder:
                 target_url = entry['target']
                 tools_run_for_scan = entry.get('tools', [])
-                analyze_js = entry.get('analyze_js_for_ai', False)
                 break
     
     if not target_url:
         return "Tarama bilgisi bulunamadı.", 404
 
     # Base context for AI
-    ai_initial_context = "You are a Cyber Security Tool. Below you will have some sublist3r, subdomainizer and ffuf results, and potentially JavaScript file contents. You should give ideas and probabilities based on that and chat with the user. Respond in language user talks.\n\n"
+    ai_initial_context = "You are a Cyber Security Tool named Renaissance Recon (Rönesans). Below you will have some sublist3r, subdomainizer and ffuf results, and potentially JavaScript file contents. You should give ideas and probabilities based on that and chat with the user. Respond in language user talks.\n\n"
     ai_initial_context += f"Scan Target: {target_url}\n\n"
 
     # --- Gather data for AI context ---
@@ -465,19 +489,16 @@ def ai_chat_page(scan_folder):
                     else:
                         ffuf_results_for_ai += "No paths found by FFUF or results were filtered out.\n"
                     
-                    if analyze_js:
-                        js_files_content = "\n--- JavaScript Files Content (from FFUF) ---\n"
-                        found_js = False
-                        for res in data_for_ai.get('ffuf_results', []):
-                            url = res.get('url')
-                            if url and url.endswith('.js'):
-                                found_js = True
-                                js_content = fetch_js_content(url)
-                                js_files_content += f"--- Content of {url} ---\n{js_content}\n\n"
-                        if found_js:
-                             ffuf_results_for_ai += js_files_content
-                        else:
-                            ffuf_results_for_ai += "No .js files found in FFUF results or JS analysis was not enabled for AI.\n"
+                    # Potansiyel olarak FFUF ile bulunan .js dosyalarını da ekleyebiliriz.
+                    ffuf_js_files_content = ""
+                    for res in data_for_ai.get('ffuf_results', []):
+                        url = res.get('url')
+                        if url and url.endswith('.js'):
+                            # JS dosyasının içeriğini çek
+                            js_content = fetch_js_content(url)
+                            ffuf_js_files_content += f"\n\n--- JS File: {url} ---\n{js_content}"
+                    if ffuf_js_files_content:
+                        ffuf_results_for_ai += ffuf_js_files_content
             except Exception as e:
                 ffuf_results_for_ai = f"--- FFUF Results ---\nError processing FFUF results: {str(e)}\n"
         else:
@@ -512,8 +533,22 @@ def gemini_chat_handler():
         chat = model.start_chat(history=chat_history)
         response = chat.send_message(user_message)
         
-        return jsonify({"reply": response.text})
+        # Check for content and finish reason before accessing response.text
+        if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+            return jsonify({"reply": response.text})
+        else:
+            error_detail = "No valid content part in response."
+            if response.prompt_feedback:
+                error_detail += f" Prompt Feedback: {response.prompt_feedback}."
+            if response.candidates and response.candidates[0].finish_reason:
+                error_detail += f" Finish Reason: {response.candidates[0].finish_reason}."
+            if response.candidates and response.candidates[0].safety_ratings:
+                error_detail += f" Safety Ratings: {response.candidates[0].safety_ratings}."
+            print(f"Gemini API Error: {error_detail}") # Log to server console
+            return jsonify({"error": f"AI yanıtı alınamadı veya içerik filtrelendi. Detay: {error_detail}"}), 500
+
     except Exception as e:
+        print(f"Gemini API Exception: {str(e)}") # Log to server console
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
