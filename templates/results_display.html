@@ -6,6 +6,7 @@
     <title>Tarama Sonuçları - {% if target %}{{ target }}{% else %}Xnes{% endif %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         /* Inter font for consistency */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -104,9 +105,14 @@
         <main class="space-y-8">
             {% if 'sublist3r' in tools_run and (sublist3r_stdout or sublist3r_stderr) %}
             <div class="result-section bg-gray-700/50 p-5 md:p-6 rounded-lg shadow-lg">
-                <h2 class="text-xl md:text-2xl font-semibold text-gray-200 mb-4 border-b border-gray-600 pb-3">
-                    <i class="fab fa-searchengin mr-2 text-purple-400"></i>Sublist3r Sonuçları
-                </h2>
+                <div class="flex justify-between items-center mb-4 border-b border-gray-600 pb-3">
+                    <h2 class="text-xl md:text-2xl font-semibold text-gray-200">
+                        <i class="fab fa-searchengin mr-2 text-purple-400"></i>Sublist3r Sonuçları
+                    </h2>
+                    <button onclick="downloadResults('sublist3r')" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors duration-200">
+                        <i class="fas fa-download mr-2"></i>İndir
+                    </button>
+                </div>
                 
                 {% if sublist3r_stdout %}
                 <div id="sublist3r_parsed_subdomains" class="parsed-content-container mb-4">
@@ -142,9 +148,14 @@
 
             {% if 'subdomainizer' in tools_run and (subdomainizer_stdout or subdomainizer_stderr) %}
             <div class="result-section bg-gray-700/50 p-5 md:p-6 rounded-lg shadow-lg">
-                <h2 class="text-xl md:text-2xl font-semibold text-gray-200 mb-4 border-b border-gray-600 pb-3">
-                    <i class="fas fa-code-branch mr-2 text-pink-500"></i>SubDomainizer Sonuçları
-                </h2>
+                <div class="flex justify-between items-center mb-4 border-b border-gray-600 pb-3">
+                    <h2 class="text-xl md:text-2xl font-semibold text-gray-200">
+                        <i class="fas fa-code-branch mr-2 text-pink-500"></i>SubDomainizer Sonuçları
+                    </h2>
+                    <button onclick="downloadResults('subdomainizer')" class="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg transition-colors duration-200">
+                        <i class="fas fa-download mr-2"></i>İndir
+                    </button>
+                </div>
 
                 {% if subdomainizer_cloudurls and subdomainizer_cloudurls|length > 0 %}
                 <div class="mb-4">
@@ -195,9 +206,14 @@
             <div class="result-section bg-gray-700/50 p-6 rounded-lg shadow-lg mb-8">
                 <details class="bg-gray-700 rounded-md shadow-inner">
                     <summary class="cursor-pointer p-3 font-medium text-gray-300 hover:bg-gray-600/70 rounded-t-md">
-                        <h2 class="text-2xl font-semibold text-gray-200 inline-flex items-center">
-                            <i class="fas fa-folder-open mr-2 text-red-500"></i>FFUF Sonuçları
-                        </h2>
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-2xl font-semibold text-gray-200 inline-flex items-center">
+                                <i class="fas fa-folder-open mr-2 text-red-500"></i>FFUF Sonuçları
+                            </h2>
+                            <button onclick="event.stopPropagation(); downloadResults('ffuf')" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors duration-200">
+                                <i class="fas fa-download mr-2"></i>İndir
+                            </button>
+                        </div>
                     </summary>
                     <div class="p-3 border-t border-gray-600">
                         {% if ffuf_json_parsed is not none and ffuf_json_parsed %}
@@ -275,15 +291,103 @@
             </main>
 
         <footer class="mt-12 text-center">
-            <a href="{{ url_for('index') }}"
-               class="inline-block bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 px-8 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-purple-500">
-                <i class="fas fa-arrow-left mr-2"></i>Yeni Tarama Başlat
-            </a>
+            <div class="flex justify-center space-x-4 mb-8">
+                <button onclick="downloadAllResults()" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 px-8 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-purple-500">
+                    <i class="fas fa-download mr-2"></i>Tüm Sonuçları İndir
+                </button>
+                <a href="{{ url_for('index') }}"
+                   class="inline-block bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 px-8 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-purple-500">
+                    <i class="fas fa-arrow-left mr-2"></i>Yeni Tarama Başlat
+                </a>
+            </div>
             <p class="text-gray-500 mt-8 pb-4">&copy; 2025 Xnes. Tüm hakları saklıdır.</p>
         </footer>
     </div>
 {% raw %}
     <script>
+        // Global download functions
+        function downloadResults(tool) {
+            let content = '';
+            let filename = '';
+
+            switch(tool) {
+                case 'sublist3r':
+                    const sublist3rPre = document.querySelector('#sublist3r_parsed_subdomains pre');
+                    content = sublist3rPre ? sublist3rPre.textContent : '';
+                    filename = 'sublist3r_results.txt';
+                    break;
+                case 'subdomainizer':
+                    const subdomainsPre = document.querySelector('#subdomainizer_parsed_subdomains pre');
+                    const secretsPre = document.querySelector('#subdomainizer_parsed_secrets pre');
+                    content = '=== Subdomains ===\n' + (subdomainsPre ? subdomainsPre.textContent : '') + 
+                            '\n\n=== Secrets ===\n' + (secretsPre ? secretsPre.textContent : '');
+                    filename = 'subdomainizer_results.txt';
+                    break;
+                case 'ffuf':
+                    const ffufResults = JSON.parse(document.getElementById('ffuf-results-body').dataset.results || '[]');
+                    content = JSON.stringify(ffufResults, null, 2);
+                    filename = 'ffuf_results.json';
+                    break;
+            }
+
+            if (content) {
+                const blob = new Blob([content], { type: 'text/plain' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }
+        }
+
+        function downloadAllResults() {
+            const tools = ['sublist3r', 'subdomainizer', 'ffuf'];
+            const zip = new JSZip();
+            
+            tools.forEach(tool => {
+                let content = '';
+                let filename = '';
+
+                switch(tool) {
+                    case 'sublist3r':
+                        const sublist3rPre = document.querySelector('#sublist3r_parsed_subdomains pre');
+                        content = sublist3rPre ? sublist3rPre.textContent : '';
+                        filename = 'sublist3r_results.txt';
+                        break;
+                    case 'subdomainizer':
+                        const subdomainsPre = document.querySelector('#subdomainizer_parsed_subdomains pre');
+                        const secretsPre = document.querySelector('#subdomainizer_parsed_secrets pre');
+                        content = '=== Subdomains ===\n' + (subdomainsPre ? subdomainsPre.textContent : '') + 
+                                '\n\n=== Secrets ===\n' + (secretsPre ? secretsPre.textContent : '');
+                        filename = 'subdomainizer_results.txt';
+                        break;
+                    case 'ffuf':
+                        const ffufResults = JSON.parse(document.getElementById('ffuf-results-body').dataset.results || '[]');
+                        content = JSON.stringify(ffufResults, null, 2);
+                        filename = 'ffuf_results.json';
+                        break;
+                }
+
+                if (content) {
+                    zip.file(filename, content);
+                }
+            });
+
+            zip.generateAsync({type: 'blob'}).then(function(content) {
+                const url = window.URL.createObjectURL(content);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'scan_results.zip';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const container = document.querySelector('.bg-gray-800');
             const scanFolder = container.dataset.scanFolder;
