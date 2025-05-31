@@ -193,74 +193,83 @@
             
             {% if 'ffuf' in tools_run and (ffuf_json_parsed is not none or ffuf_json_raw or ffuf_stderr) %}
             <div class="result-section bg-gray-700/50 p-6 rounded-lg shadow-lg mb-8">
-                <h2 class="text-2xl font-semibold text-gray-200 mb-4 border-b border-gray-600 pb-2">
-                    <i class="fas fa-folder-open mr-2 text-red-500"></i>FFUF Sonuçları
-                </h2>
-                {% if ffuf_json_parsed is not none and ffuf_json_parsed %} {# Assuming ffuf_json_parsed is the list of results #}
-                    <h3 class="text-lg font-medium text-gray-300 mb-3">Bulunan Yollar:</h3>
-                    <div class="overflow-x-auto rounded-md shadow">
-                        <table class="ffuf-results-table w-full text-sm text-left text-gray-300 bg-gray-800">
-                            <thead class="text-xs text-gray-200 uppercase bg-gray-700">
-                                <tr>
-                                    <th scope="col" class="px-6 py-3">URL</th>
-                                    <th scope="col" class="px-6 py-3">Durum</th>
-                                    <th scope="col" class="px-6 py-3">Uzunluk</th>
-                                    <th scope="col" class="px-6 py-3">Kelimeler</th>
-                                    <th scope="col" class="px-6 py-3">Satırlar</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for result in ffuf_json_parsed %} {# Iterate directly if it's a list #}
-                                <tr class="bg-gray-800 border-b border-gray-700 hover:bg-gray-700/70">
-                                    <td class="px-6 py-4 font-medium whitespace-nowrap">
-                                        <a href="{{ result.url }}" target="_blank" rel="noopener noreferrer">{{ result.url }}</a>
-                                    </td>
-                                    <td class="px-6 py-4">{{ result.status }}</td>
-                                    <td class="px-6 py-4">{{ result.length }}</td>
-                                    <td class="px-6 py-4">{{ result.words }}</td>
-                                    <td class="px-6 py-4">{{ result.lines }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% elif ffuf_json_parsed is none and ffuf_json_raw %}
-                    <div id="ffuf-progress" class="mb-4 p-4 bg-gray-800 rounded-lg">
-                        <div class="flex items-center justify-between mb-2">
-                            <h3 class="text-lg font-medium text-gray-300">Tarama Devam Ediyor...</h3>
-                            <span class="text-sm text-gray-400" id="ffuf-time-elapsed">0:00</span>
-                        </div>
-                        <div class="w-full bg-gray-700 rounded-full h-2.5">
-                            <div class="bg-purple-600 h-2.5 rounded-full animate-pulse" style="width: 100%"></div>
-                        </div>
-                        <p class="mt-2 text-sm text-gray-400">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            FFUF taraması devam ediyor. Bu işlem büyük kelime listeleri için 30 dakikaya kadar sürebilir.
-                        </p>
-                    </div>
-                    <h3 class="text-lg font-medium text-gray-300 mb-2">JSON Çıktısı (Ham Veri):</h3>
-                    <pre class="bg-gray-800 p-4 rounded-md overflow-x-auto text-sm max-h-96 custom-scrollbar">{{ ffuf_json_raw if ffuf_json_raw.strip() else "FFUF JSON çıktısı yok veya işlenemedi." }}</pre>
-                {% else %} {# Covers ffuf_json_parsed is not None but empty, or no data at all #}
-                    <p class="text-gray-400 my-4"><i class="fas fa-info-circle mr-1 text-blue-400"></i>FFUF ile herhangi bir yol bulunamadı veya filtrelere uyan sonuç yok.</p>
-                    {% if ffuf_json_raw %}
-                    <h3 class="text-lg font-medium text-gray-300 mb-2">JSON Çıktısı (Ham Veri):</h3>
-                    <pre class="bg-gray-800 p-4 rounded-md overflow-x-auto text-sm max-h-96 custom-scrollbar">{{ ffuf_json_raw if ffuf_json_raw.strip() else "FFUF JSON çıktısı boş." }}</pre>
-                    {% endif %}
-                {% endif %}
-
-                {% if ffuf_stderr %}
-                <details class="mt-6 bg-gray-700 rounded-md shadow-inner">
+                <details class="bg-gray-700 rounded-md shadow-inner">
                     <summary class="cursor-pointer p-3 font-medium text-gray-300 hover:bg-gray-600/70 rounded-t-md">
-                        Konsol Hata Çıktısı (stderr):
+                        <h2 class="text-2xl font-semibold text-gray-200 inline-flex items-center">
+                            <i class="fas fa-folder-open mr-2 text-red-500"></i>FFUF Sonuçları
+                        </h2>
                     </summary>
                     <div class="p-3 border-t border-gray-600">
-                         <pre class="bg-gray-800 p-4 rounded-b-md overflow-x-auto text-sm max-h-60 custom-scrollbar">{{ ffuf_stderr if ffuf_stderr.strip() else "FFUF için konsol hata çıktısı yok." }}</pre>
+                        {% if ffuf_json_parsed is not none and ffuf_json_parsed %}
+                            <div class="mb-4">
+                                <h3 class="text-lg font-medium text-gray-300 mb-3">Bulunan Yollar:</h3>
+                                <div class="overflow-x-auto rounded-md shadow">
+                                    <table class="ffuf-results-table w-full text-sm text-left text-gray-300 bg-gray-800">
+                                        <thead class="text-xs text-gray-200 uppercase bg-gray-700">
+                                            <tr>
+                                                <th scope="col" class="px-6 py-3">URL</th>
+                                                <th scope="col" class="px-6 py-3">Durum</th>
+                                                <th scope="col" class="px-6 py-3">Uzunluk</th>
+                                                <th scope="col" class="px-6 py-3">Kelimeler</th>
+                                                <th scope="col" class="px-6 py-3">Satırlar</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="ffuf-results-body" data-results='{{ ffuf_json_parsed|tojson|safe if ffuf_json_parsed else "[]" }}'>
+                                            <!-- Results will be loaded here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div id="ffuf-pagination" class="mt-4 flex justify-between items-center">
+                                    <div class="text-sm text-gray-400">
+                                        Toplam <span id="ffuf-total-count">0</span> sonuç
+                                    </div>
+                                    <div class="flex space-x-2">
+                                        <button id="ffuf-prev-page" class="px-3 py-1 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <i class="fas fa-chevron-left"></i> Önceki
+                                        </button>
+                                        <span id="ffuf-page-info" class="px-3 py-1 text-gray-300">Sayfa 1</span>
+                                        <button id="ffuf-next-page" class="px-3 py-1 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                                            Sonraki <i class="fas fa-chevron-right"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        {% elif ffuf_json_parsed is none and ffuf_json_raw %}
+                            <div id="ffuf-progress" class="mb-4 p-4 bg-gray-800 rounded-lg">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h3 class="text-lg font-medium text-gray-300">Tarama Devam Ediyor...</h3>
+                                    <span class="text-sm text-gray-400" id="ffuf-time-elapsed">0:00</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2.5">
+                                    <div class="bg-purple-600 h-2.5 rounded-full animate-pulse" style="width: 100%"></div>
+                                </div>
+                                <p class="mt-2 text-sm text-gray-400">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    FFUF taraması devam ediyor. Bu işlem büyük kelime listeleri için 30 dakikaya kadar sürebilir.
+                                </p>
+                            </div>
+                            <h3 class="text-lg font-medium text-gray-300 mb-2">JSON Çıktısı (Ham Veri):</h3>
+                            <pre class="bg-gray-800 p-4 rounded-md overflow-x-auto text-sm max-h-96 custom-scrollbar">{{ ffuf_json_raw if ffuf_json_raw.strip() else "FFUF JSON çıktısı yok veya işlenemedi." }}</pre>
+                        {% else %}
+                            <p class="text-gray-400 my-4"><i class="fas fa-info-circle mr-1 text-blue-400"></i>FFUF ile herhangi bir yol bulunamadı veya filtrelere uyan sonuç yok.</p>
+                            {% if ffuf_json_raw %}
+                            <h3 class="text-lg font-medium text-gray-300 mb-2">JSON Çıktısı (Ham Veri):</h3>
+                            <pre class="bg-gray-800 p-4 rounded-md overflow-x-auto text-sm max-h-96 custom-scrollbar">{{ ffuf_json_raw if ffuf_json_raw.strip() else "FFUF JSON çıktısı boş." }}</pre>
+                            {% endif %}
+                        {% endif %}
+
+                        {% if ffuf_stderr %}
+                        <details class="mt-6 bg-gray-700 rounded-md shadow-inner">
+                            <summary class="cursor-pointer p-3 font-medium text-gray-300 hover:bg-gray-600/70 rounded-t-md">
+                                Konsol Hata Çıktısı (stderr):
+                            </summary>
+                            <div class="p-3 border-t border-gray-600">
+                                <pre class="bg-gray-800 p-4 rounded-b-md overflow-x-auto text-sm max-h-60 custom-scrollbar">{{ ffuf_stderr if ffuf_stderr.strip() else "FFUF için konsol hata çıktısı yok." }}</pre>
+                            </div>
+                        </details>
+                        {% endif %}
                     </div>
                 </details>
-                {% endif %}
-                 {% if not ffuf_json_parsed and not ffuf_json_raw and not ffuf_stderr %}
-                    <p class="text-gray-400"><i class="fas fa-info-circle mr-1 text-blue-400"></i>FFUF için gösterilecek sonuç veya çıktı bulunmamaktadır.</p>
-                {% endif %}
             </div>
             {% endif %}
             </main>
@@ -454,6 +463,59 @@
             window.addEventListener('beforeunload', () => {
                 clearInterval(statusInterval);
             });
+
+            // FFUF results pagination
+            const ITEMS_PER_PAGE = 50;
+            let currentPage = 1;
+            let ffufResults = [];
+
+            function loadFFUFResults() {
+                const results = JSON.parse(document.getElementById('ffuf-results-body').dataset.results || '[]');
+                ffufResults = results;
+                const totalPages = Math.ceil(results.length / ITEMS_PER_PAGE);
+                
+                document.getElementById('ffuf-total-count').textContent = results.length;
+                document.getElementById('ffuf-prev-page').disabled = currentPage === 1;
+                document.getElementById('ffuf-next-page').disabled = currentPage === totalPages;
+                document.getElementById('ffuf-page-info').textContent = `Sayfa ${currentPage} / ${totalPages}`;
+                
+                const start = (currentPage - 1) * ITEMS_PER_PAGE;
+                const end = start + ITEMS_PER_PAGE;
+                const pageResults = results.slice(start, end);
+                
+                const tbody = document.getElementById('ffuf-results-body');
+                tbody.innerHTML = pageResults.map(result => `
+                    <tr class="bg-gray-800 border-b border-gray-700 hover:bg-gray-700/70">
+                        <td class="px-6 py-4 font-medium whitespace-nowrap">
+                            <a href="${result.url}" target="_blank" rel="noopener noreferrer">${result.url}</a>
+                        </td>
+                        <td class="px-6 py-4">${result.status}</td>
+                        <td class="px-6 py-4">${result.length}</td>
+                        <td class="px-6 py-4">${result.words}</td>
+                        <td class="px-6 py-4">${result.lines}</td>
+                    </tr>
+                `).join('');
+            }
+
+            document.getElementById('ffuf-prev-page')?.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    loadFFUFResults();
+                }
+            });
+
+            document.getElementById('ffuf-next-page')?.addEventListener('click', () => {
+                const totalPages = Math.ceil(ffufResults.length / ITEMS_PER_PAGE);
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    loadFFUFResults();
+                }
+            });
+
+            // Initial load of FFUF results
+            if (document.getElementById('ffuf-results-body')) {
+                loadFFUFResults();
+            }
         });
     </script>
 {% endraw %}
