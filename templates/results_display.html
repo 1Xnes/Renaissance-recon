@@ -61,7 +61,9 @@
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen p-4 md:p-8">
-    <div class="bg-gray-800 p-6 md:p-10 rounded-xl shadow-2xl w-full max-w-5xl mx-auto">
+    <div class="bg-gray-800 p-6 md:p-10 rounded-xl shadow-2xl w-full max-w-5xl mx-auto" 
+         data-tools='{{ tools_run|tojson|safe }}' 
+         data-scan-folder="{{ scan_folder }}">
         <header class="text-center mb-10">
             <h1 class="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">
                 <i class="fas fa-poll-h mr-2"></i>Tarama Sonuçları
@@ -73,6 +75,28 @@
             {% endif %}
         </header>
 
+        <!-- Scan Status Section -->
+        <div id="scan-status" class="mb-8 bg-gray-800 p-4 rounded-lg">
+            <h2 class="text-xl font-semibold text-gray-200 mb-4">
+                <i class="fas fa-tasks mr-2 text-purple-400"></i>Tarama Durumu
+            </h2>
+            <div id="status-container" class="space-y-3">
+                {% for tool in tools_run %}
+                <div id="status-{{ tool }}" class="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+                    <div class="flex items-center">
+                        <span class="text-lg font-medium text-gray-300 capitalize">{{ tool }}</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="status-badge px-3 py-1 rounded-full text-sm font-medium bg-gray-600 text-gray-300">
+                            Bekleniyor...
+                        </span>
+                        <span class="status-time ml-3 text-sm text-gray-400"></span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
         <main class="space-y-8">
             {% if 'sublist3r' in tools_run and (sublist3r_stdout or sublist3r_stderr) %}
             <div class="result-section bg-gray-700/50 p-5 md:p-6 rounded-lg shadow-lg">
@@ -83,7 +107,7 @@
                 {% if sublist3r_stdout %}
                 <div id="sublist3r_parsed_subdomains" class="parsed-content-container mb-4">
                     <h3 class="text-lg font-medium text-gray-300 mb-2">Bulunan Subdomainler:</h3>
-                    <pre class="bg-gray-800 p-4 rounded-md overflow-x-auto text-sm max-h-80 custom-scrollbar"><i>İşleniyor...</i></pre>
+                    <pre class="bg-gray-800 p-4 rounded-md overflow-x-auto text-sm max-h-80 custom-scrollbar"></pre>
                 </div>
                 <details class="bg-gray-700 rounded-md shadow-inner">
                     <summary class="cursor-pointer p-3 font-medium text-gray-300 hover:bg-gray-600/70 rounded-t-md">
@@ -129,11 +153,11 @@
                 {% if subdomainizer_stdout %}
                 <div id="subdomainizer_parsed_subdomains" class="parsed-content-container mb-4">
                     <h3 class="text-lg font-medium text-gray-300 mb-2">Bulunan Subdomainler:</h3>
-                    <pre class="bg-gray-800 p-4 rounded-md overflow-x-auto text-sm max-h-80 custom-scrollbar"><i>İşleniyor...</i></pre>
+                    <pre class="bg-gray-800 p-4 rounded-md overflow-x-auto text-sm max-h-80 custom-scrollbar"></pre>
                 </div>
                 <div id="subdomainizer_parsed_secrets" class="parsed-content-container mb-4">
                     <h3 class="text-lg font-medium text-gray-300 mb-2">Bulunan Secretler:</h3>
-                    <pre class="bg-gray-800 p-4 rounded-md overflow-x-auto text-sm max-h-80 custom-scrollbar"><i>İşleniyor...</i></pre>
+                    <pre class="bg-gray-800 p-4 rounded-md overflow-x-auto text-sm max-h-80 custom-scrollbar"></pre>
                 </div>
                 
                 <details class="bg-gray-700 rounded-md shadow-inner">
@@ -197,8 +221,20 @@
                         </table>
                     </div>
                 {% elif ffuf_json_parsed is none and ffuf_json_raw %}
+                    <div id="ffuf-progress" class="mb-4 p-4 bg-gray-800 rounded-lg">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-lg font-medium text-gray-300">Tarama Devam Ediyor...</h3>
+                            <span class="text-sm text-gray-400" id="ffuf-time-elapsed">0:00</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-2.5">
+                            <div class="bg-purple-600 h-2.5 rounded-full animate-pulse" style="width: 100%"></div>
+                        </div>
+                        <p class="mt-2 text-sm text-gray-400">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            FFUF taraması devam ediyor. Bu işlem büyük kelime listeleri için 30 dakikaya kadar sürebilir.
+                        </p>
+                    </div>
                     <h3 class="text-lg font-medium text-gray-300 mb-2">JSON Çıktısı (Ham Veri):</h3>
-                    <p class="text-sm text-yellow-400 mb-2"><i class="fas fa-exclamation-triangle mr-1"></i>JSON verisi işlenirken bir sorun oluştu veya dosya bulunamadı. Ham veri aşağıdadır:</p>
                     <pre class="bg-gray-800 p-4 rounded-md overflow-x-auto text-sm max-h-96 custom-scrollbar">{{ ffuf_json_raw if ffuf_json_raw.strip() else "FFUF JSON çıktısı yok veya işlenemedi." }}</pre>
                 {% else %} {# Covers ffuf_json_parsed is not None but empty, or no data at all #}
                     <p class="text-gray-400 my-4"><i class="fas fa-info-circle mr-1 text-blue-400"></i>FFUF ile herhangi bir yol bulunamadı veya filtrelere uyan sonuç yok.</p>
@@ -235,160 +271,191 @@
     </div>
 {% raw %}
     <script>
-        // JavaScript for parsing and displaying extracted data
-        // Wait for the DOM to be fully loaded before running scripts
-        document.addEventListener('DOMContentLoaded', () => {
-            
-            /**
-             * Parses Sublist3r stdout to extract subdomains.
-             * @param {string} stdoutText - The raw stdout string from Sublist3r.
-             * @returns {string[]} An array of found subdomains.
-             */
-            function parseSublist3rStdout(stdoutText) {
-                if (!stdoutText) return [];
-                const lines = stdoutText.split('\n');
-                const subdomains = [];
-                const marker = "[-] Total Unique Subdomains Found:";
-                let foundMarker = false;
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.querySelector('.bg-gray-800');
+            const scanFolder = container.dataset.scanFolder;
+            const tools = JSON.parse(container.dataset.tools || '[]');
+            let allToolsCompleted = false;
 
-                for (const line of lines) {
-                    if (line.includes(marker)) {
-                        foundMarker = true;
-                        continue; // Skip the marker line itself
-                    }
-                    if (foundMarker) {
-                        const trimmedLine = line.trim();
-                        // Filter out potential noise or empty lines after subdomains list
-                        if (trimmedLine && !trimmedLine.startsWith("[") && !trimmedLine.startsWith("-") && !trimmedLine.startsWith("#") && trimmedLine.includes('.')) {
-                            // Further check to avoid lines that are clearly not just subdomains
-                            if (trimmedLine.split(" ").length === 1 && trimmedLine.match(/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)) {
-                                subdomains.push(trimmedLine);
-                            }
-                        } else if (trimmedLine.startsWith("[")) { 
-                            // If we encounter another status line from Sublist3r, stop parsing subdomains.
-                            // This helps if there's trailing output after the subdomain list.
-                            break;
-                        }
-                    }
-                }
-                return subdomains;
+            // Immediately process results when page loads
+            if (document.getElementById('sublist3r_full_stdout')) {
+                parseSublist3rResults();
+            }
+            if (document.getElementById('subdomainizer_full_stdout')) {
+                parseSubDomainizerResults();
             }
 
-            /**
-             * Parses SubDomainizer stdout to extract subdomains and secrets.
-             * @param {string} stdoutText - The raw stdout string from SubDomainizer.
-             * @returns {{subdomains: string[], secrets: string[]}} An object containing arrays of subdomains and secrets.
-             */
-            function parseSubDomainizerStdout(stdoutText) {
-                if (!stdoutText) return { subdomains: [], secrets: [] };
-                const lines = stdoutText.split('\n');
-                const subdomains = [];
-                const secrets = [];
-                let readingSubdomains = false;
-                let readingSecrets = false;
-
-                const subdomainsHeaderMarker = "Got some subdomains..."; // Actual header before list
-                const subdomainsStartMarker = "Total Subdomains:"; // Line indicating count, often before the actual list starts or after a block
-                const subdomainsEndMarker = /____________________________________________________________|Found some secrets\(might be false positive\)|\[\*\] Searching for Inline Javascripts.../; // End of subdomains block or start of next significant block
-
-                const secretsHeaderMarker = "Found some secrets(might be false positive)..."; // Actual header
-                const secretsStartMarker = "Total Possible Secrets:"; // Line indicating count
-                const secretsEndMarker = /_______________________End of Results_______________________/; // End of secrets block
-
-                for (const line of lines) {
-                    const trimmedLine = line.trim();
-
-                    if (line.includes(subdomainsHeaderMarker) || line.includes(subdomainsStartMarker)) {
-                        readingSubdomains = true;
-                        readingSecrets = false; 
-                        continue; 
-                    }
-                    if (line.includes(secretsHeaderMarker) || line.includes(secretsStartMarker)) {
-                        readingSecrets = true;
-                        readingSubdomains = false; 
-                        continue;
-                    }
-
-                    if (readingSubdomains) {
-                        if (subdomainsEndMarker.test(line)) {
-                            readingSubdomains = false;
-                        } else if (trimmedLine && !trimmedLine.startsWith("Total Subdomains:") && trimmedLine.includes('.') && !trimmedLine.startsWith("http") && !trimmedLine.includes(" ")) {
-                            // More specific check for subdomain format
-                             if (trimmedLine.match(/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)) {
-                                subdomains.push(trimmedLine);
-                            }
-                        }
-                    } else if (readingSecrets) {
-                        if (secretsEndMarker.test(line)) {
-                            readingSecrets = false;
-                        } else if (trimmedLine && !trimmedLine.startsWith("Total Possible Secrets:")) {
-                            secrets.push(trimmedLine);
-                        }
-                    }
-                }
-                // Remove duplicates that might arise from parsing logic
-                return { 
-                    subdomains: [...new Set(subdomains)], 
-                    secrets: [...new Set(secrets)] 
-                };
-            }
-
-            // Process Sublist3r Output
-            const sublist3rFullStdoutPre = document.getElementById('sublist3r_full_stdout');
-            if (sublist3rFullStdoutPre) {
-                const sublist3rStdoutText = sublist3rFullStdoutPre.textContent;
-                const sublist3rParsedSubdomainsContainer = document.getElementById('sublist3r_parsed_subdomains');
-                if (sublist3rParsedSubdomainsContainer) {
-                    const sublist3rSubdomains = parseSublist3rStdout(sublist3rStdoutText);
-                    const subdomainsPre = sublist3rParsedSubdomainsContainer.querySelector('pre');
-                    if (sublist3rSubdomains.length > 0) {
-                        subdomainsPre.textContent = sublist3rSubdomains.join('\n');
-                    } else {
-                        subdomainsPre.innerHTML = '<i>Bu araçla subdomain bulunamadı veya çıktı ayrıştırılamadı. Tam çıktıya göz atın.</i>';
-                    }
-                }
-            } else {
+            function parseSublist3rResults() {
+                const sublist3rStdout = document.getElementById('sublist3r_full_stdout');
                 const sublist3rParsedContainer = document.getElementById('sublist3r_parsed_subdomains');
-                if (sublist3rParsedContainer && sublist3rParsedContainer.querySelector('pre').innerHTML.includes('İşleniyor...')) {
-                     sublist3rParsedContainer.querySelector('pre').innerHTML = '<i>Sublist3r standart çıktısı bulunmuyor.</i>';
+                
+                if (sublist3rStdout && sublist3rParsedContainer) {
+                    try {
+                        const content = sublist3rStdout.textContent;
+                        const lines = content.split('\n');
+                        const subdomains = new Set();
+
+                        for (const line of lines) {
+                            const trimmedLine = line.trim();
+                            if (!trimmedLine || trimmedLine.startsWith('[') || trimmedLine.startsWith('Exception')) {
+                                continue;
+                            }
+                            if (trimmedLine.includes('.') && !trimmedLine.includes(' ') && 
+                                !trimmedLine.startsWith('http') && !trimmedLine.startsWith('www')) {
+                                subdomains.add(trimmedLine);
+                            }
+                        }
+
+                        const subdomainsPre = sublist3rParsedContainer.querySelector('pre');
+                        if (subdomains.size > 0) {
+                            subdomainsPre.textContent = Array.from(subdomains).join('\n');
+                        } else {
+                            subdomainsPre.innerHTML = '<i>Bu araçla subdomain bulunamadı. Çıktıda geçerli bir subdomain formatı bulunamadı.</i>';
+                        }
+                    } catch (error) {
+                        const subdomainsPre = sublist3rParsedContainer.querySelector('pre');
+                        subdomainsPre.innerHTML = `<i>Sonuçlar ayrıştırılamadı. Hata: ${error.message}</i>`;
+                    }
                 }
             }
 
-            // Process SubDomainizer Output
-            const subdomainizerFullStdoutPre = document.getElementById('subdomainizer_full_stdout');
-            if (subdomainizerFullStdoutPre) {
-                const subdomainizerStdoutText = subdomainizerFullStdoutPre.textContent;
-                const { subdomains: sdSubdomains, secrets: sdSecrets } = parseSubDomainizerStdout(subdomainizerStdoutText);
+            function parseSubDomainizerResults() {
+                const subdomainizerStdout = document.getElementById('subdomainizer_full_stdout');
+                const subdomainsContainer = document.getElementById('subdomainizer_parsed_subdomains');
+                const secretsContainer = document.getElementById('subdomainizer_parsed_secrets');
+                
+                if (subdomainizerStdout && subdomainsContainer && secretsContainer) {
+                    try {
+                        const content = subdomainizerStdout.textContent;
+                        const lines = content.split('\n');
+                        const subdomains = new Set();
+                        const secrets = new Set();
+                        let inSubdomains = false;
+                        let inSecrets = false;
 
-                const subdomainizerParsedSubdomainsContainer = document.getElementById('subdomainizer_parsed_subdomains');
-                if (subdomainizerParsedSubdomainsContainer) {
-                    const subdomainsPre = subdomainizerParsedSubdomainsContainer.querySelector('pre');
-                    if (sdSubdomains.length > 0) {
-                        subdomainsPre.textContent = sdSubdomains.join('\n');
-                    } else {
-                        subdomainsPre.innerHTML = '<i>Bu araçla subdomain bulunamadı veya çıktı ayrıştırılamadı. Tam çıktıya göz atın.</i>';
-                    }
-                }
+                        for (const line of lines) {
+                            const trimmedLine = line.trim();
+                            
+                            if (trimmedLine.includes('Got some subdomains...')) {
+                                inSubdomains = true;
+                                inSecrets = false;
+                                continue;
+                            }
+                            if (trimmedLine.includes('Found some secrets')) {
+                                inSecrets = true;
+                                inSubdomains = false;
+                                continue;
+                            }
+                            if (trimmedLine.includes('End of Results')) {
+                                inSubdomains = false;
+                                inSecrets = false;
+                                continue;
+                            }
 
-                const subdomainizerParsedSecretsContainer = document.getElementById('subdomainizer_parsed_secrets');
-                if (subdomainizerParsedSecretsContainer) {
-                    const secretsPre = subdomainizerParsedSecretsContainer.querySelector('pre');
-                    if (sdSecrets.length > 0) {
-                        secretsPre.textContent = sdSecrets.join('\n');
-                    } else {
-                        secretsPre.innerHTML = '<i>Bu araçla secret bulunamadı veya çıktı ayrıştırılamadı. Tam çıktıya göz atın.</i>';
+                            if (inSubdomains && trimmedLine && !trimmedLine.startsWith('Total Subdomains:')) {
+                                if (trimmedLine.includes('.') && !trimmedLine.includes(' ')) {
+                                    subdomains.add(trimmedLine);
+                                }
+                            } else if (inSecrets && trimmedLine && !trimmedLine.startsWith('Total Secrets:')) {
+                                secrets.add(trimmedLine);
+                            }
+                        }
+
+                        const subdomainsPre = subdomainsContainer.querySelector('pre');
+                        if (subdomains.size > 0) {
+                            subdomainsPre.textContent = Array.from(subdomains).join('\n');
+                        } else {
+                            subdomainsPre.innerHTML = '<i>Bu araçla subdomain bulunamadı. Çıktıda geçerli bir subdomain formatı bulunamadı.</i>';
+                        }
+
+                        const secretsPre = secretsContainer.querySelector('pre');
+                        if (secrets.size > 0) {
+                            secretsPre.textContent = Array.from(secrets).join('\n');
+                        } else {
+                            secretsPre.innerHTML = '<i>Bu araçla secret bulunamadı. Çıktıda geçerli bir secret formatı bulunamadı.</i>';
+                        }
+                    } catch (error) {
+                        const subdomainsPre = subdomainsContainer.querySelector('pre');
+                        const secretsPre = secretsContainer.querySelector('pre');
+                        subdomainsPre.innerHTML = `<i>Sonuçlar ayrıştırılamadı. Hata: ${error.message}</i>`;
+                        secretsPre.innerHTML = `<i>Sonuçlar ayrıştırılamadı. Hata: ${error.message}</i>`;
                     }
-                }
-            } else {
-                const sdParsedDomainsContainer = document.getElementById('subdomainizer_parsed_subdomains');
-                if (sdParsedDomainsContainer && sdParsedDomainsContainer.querySelector('pre').innerHTML.includes('İşleniyor...')) {
-                     sdParsedDomainsContainer.querySelector('pre').innerHTML = '<i>SubDomainizer alan adı çıktısı bulunmuyor.</i>';
-                }
-                const sdParsedSecretsContainer = document.getElementById('subdomainizer_parsed_secrets');
-                 if (sdParsedSecretsContainer && sdParsedSecretsContainer.querySelector('pre').innerHTML.includes('İşleniyor...')) {
-                     sdParsedSecretsContainer.querySelector('pre').innerHTML = '<i>SubDomainizer secret çıktısı bulunmuyor.</i>';
                 }
             }
+
+            function updateStatusDisplay(tool, status, message, time) {
+                const statusDiv = document.getElementById(`status-${tool}`);
+                if (!statusDiv) return;
+
+                const statusBadge = statusDiv.querySelector('.status-badge');
+                const timeSpan = statusDiv.querySelector('.status-time');
+                
+                statusBadge.textContent = status;
+                statusBadge.className = 'status-badge px-3 py-1 rounded-full text-sm font-medium';
+                
+                if (status === 'Tamamlandı') {
+                    statusBadge.classList.add('bg-green-600', 'text-white');
+                } else if (status === 'Hata' || status === 'Zaman Aşımı') {
+                    statusBadge.classList.add('bg-red-600', 'text-white');
+                } else if (status === 'Çalışıyor...') {
+                    statusBadge.classList.add('bg-blue-600', 'text-white');
+                } else {
+                    statusBadge.classList.add('bg-gray-600', 'text-gray-300');
+                }
+
+                if (time) {
+                    timeSpan.textContent = time;
+                }
+            }
+
+            function checkScanStatus() {
+                fetch(`/scan_status/${scanFolder}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        let completedCount = 0;
+                        
+                        for (const tool of tools) {
+                            const toolStatus = data[tool];
+                            if (toolStatus) {
+                                updateStatusDisplay(
+                                    tool,
+                                    toolStatus.status,
+                                    toolStatus.message,
+                                    toolStatus.last_update
+                                );
+                                
+                                if (toolStatus.status === 'Tamamlandı' || 
+                                    toolStatus.status === 'Hata' || 
+                                    toolStatus.status === 'Zaman Aşımı') {
+                                    completedCount++;
+                                }
+                            }
+                        }
+
+                        if (completedCount === tools.length && !allToolsCompleted) {
+                            allToolsCompleted = true;
+                            // Don't reload the page, just stop the status checks
+                            clearInterval(statusInterval);
+                        }
+                    })
+                    .catch(error => console.error('Error checking scan status:', error));
+            }
+
+            // Check status every 2 seconds
+            const statusInterval = setInterval(checkScanStatus, 2000);
+            
+            // Refresh FFUF results every 15 seconds
+            const ffufInterval = setInterval(refreshFFUFResults, 15000);
+            
+            // Initial checks
+            checkScanStatus();
+            refreshFFUFResults();
+
+            // Clean up intervals when page is unloaded
+            window.addEventListener('beforeunload', () => {
+                clearInterval(statusInterval);
+                clearInterval(ffufInterval);
+            });
         });
     </script>
 {% endraw %}

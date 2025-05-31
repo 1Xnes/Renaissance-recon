@@ -1,7 +1,10 @@
 import os
 import subprocess
 import json
-from flask import Flask, render_template, request, redirect, url_for
+import threading
+import time
+from datetime import datetime
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 from urllib.parse import quote_plus, unquote_plus, urlparse
 
 app = Flask(__name__)
@@ -21,6 +24,8 @@ if not os.path.exists('tools'):
 if not os.path.exists('wordlists'):
     os.makedirs('wordlists')
 
+# Global dictionary to store scan statuses
+scan_statuses = {}
 
 def get_tool_path(tool_name_with_subdir):
     # Helper function to get the absolute path to a tool's executable script.
@@ -33,7 +38,19 @@ def get_wordlist_path(wordlist_name):
     # Helper function to get the absolute path to a wordlist.
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wordlists', wordlist_name)
 
-def run_command(command, output_file_base_for_logs, tool_name):
+def update_scan_status(scan_folder, tool_name, status, message=""):
+    """Update the status of a scan in the global dictionary"""
+    if scan_folder not in scan_statuses:
+        scan_statuses[scan_folder] = {}
+    scan_statuses[scan_folder][tool_name] = {
+        'status': status,
+        'message': message,
+        'last_update': datetime.now().strftime('%H:%M:%S')
+    }
+    # Print to terminal
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {scan_folder} - {tool_name}: {status} {message}")
+
+def run_command(command, output_file_base_for_logs, tool_name, scan_folder):
     # Runs a command and captures its stdout and stderr, saving them to files.
     # command: The command to run (list of strings).
     # output_file_base_for_logs: The base name for stdout/stderr log files (e.g., "google.com_").
@@ -46,11 +63,21 @@ def run_command(command, output_file_base_for_logs, tool_name):
     # This function primarily handles stdout/stderr logging.
 
     try:
+        update_scan_status(scan_folder, tool_name, "Başlatılıyor...")
+        
         # Execute the command
         # text=True ensures stdout/stderr are strings
         # cwd sets the current working directory for the subprocess, useful if tools expect to be run from their own directory
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8', errors='replace', cwd=os.path.dirname(os.path.abspath(__file__)))
-        stdout, stderr = process.communicate(timeout=300) # Timeout after 5 minutes
+        
+        update_scan_status(scan_folder, tool_name, "Çalışıyor...")
+        
+        # For FFUF, we don't use timeout
+        if tool_name == 'ffuf':
+            stdout, stderr = process.communicate()
+        else:
+            # For other tools, use 5-minute timeout
+            stdout, stderr = process.communicate(timeout=300)
 
         # Write stdout to its log file
         with open(stdout_path, 'w', encoding='utf-8') as f_out:
@@ -59,24 +86,58 @@ def run_command(command, output_file_base_for_logs, tool_name):
         with open(stderr_path, 'w', encoding='utf-8') as f_err:
             f_err.write(stderr)
 
-        # ffuf writes its own JSON file as specified in its command arguments.
-        # This function doesn't need to return the JSON path as it's constructed before calling run_command.
+        if process.returncode == 0:
+            update_scan_status(scan_folder, tool_name, "Tamamlandı")
+        else:
+            update_scan_status(scan_folder, tool_name, "Hata", f"Return code: {process.returncode}")
 
     except subprocess.TimeoutExpired:
         # Handle command timeout
-        timeout_message = "Komut zaman aşımına uğradı (300 saniye)."
+        error_message = f"Komut zaman aşımına uğradı (300 saniye)."
+        update_scan_status(scan_folder, tool_name, "Zaman Aşımı", error_message)
         with open(stdout_path, 'w', encoding='utf-8') as f_out:
-            f_out.write(timeout_message)
+            f_out.write(error_message)
         with open(stderr_path, 'w', encoding='utf-8') as f_err:
-            f_err.write(timeout_message)
+            f_err.write(error_message)
     except Exception as e:
         # Handle other exceptions during command execution
         error_message = f"Komut çalıştırılırken bir hata oluştu: {str(e)}"
+        update_scan_status(scan_folder, tool_name, "Hata", error_message)
         with open(stdout_path, 'w', encoding='utf-8') as f_out:
             f_out.write("") # No stdout if command failed early
         with open(stderr_path, 'w', encoding='utf-8') as f_err:
             f_err.write(error_message)
 
+def run_scan_tool(tool_name, target_url, scan_folder, wordlist_path=None):
+    """Run a specific tool in a separate thread"""
+    if tool_name == 'sublist3r':
+        sublist3r_py_path = get_tool_path('Sublist3r/sublist3r')
+        parsed_url = urlparse(target_url)
+        domain_for_sublist3r = parsed_url.netloc or parsed_url.path.split('/')[0]
+        command = ['python', sublist3r_py_path, '-d', domain_for_sublist3r]
+        run_command(command, os.path.join(scan_folder, "sublist3r_"), "sublist3r", scan_folder)
+    
+    elif tool_name == 'subdomainizer':
+        subdomainizer_py_path = get_tool_path('SubDomainizer/SubDomainizer')
+        command = ['python', subdomainizer_py_path, '-u', target_url]
+        run_command(command, os.path.join(scan_folder, "subdomainizer_"), "subdomainizer", scan_folder)
+    
+    elif tool_name == 'ffuf':
+        ffuf_target_url = target_url
+        if not ffuf_target_url.endswith('/'):
+            ffuf_target_url += '/'
+        ffuf_target_url += 'FUZZ'
+        
+        ffuf_json_output_filename_base = scan_folder
+        ffuf_output_json_path = os.path.join('output', scan_folder, f"{ffuf_json_output_filename_base}_ffuf.json")
+        
+        command = [
+            'ffuf', '-u', ffuf_target_url, '-w', wordlist_path,
+            '-o', ffuf_output_json_path, '-of', 'json',
+            '-c',
+            '-mc', '200,204,301,302,307,401,403,405,500'
+        ]
+        run_command(command, os.path.join(scan_folder, "ffuf_"), "ffuf", scan_folder)
 
 def sanitize_filename(name):
     # Replaces characters that are problematic in filenames.
@@ -87,7 +148,6 @@ def sanitize_filename(name):
     # Remove or replace other potentially problematic characters as needed
     name = "".join(c for c in name if c.isalnum() or c in ('_', '-')).strip()
     return name
-
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -143,72 +203,31 @@ def index():
             scan_log.append({'folder': scan_folder_name, 'target': target_url, 'tools': selected_tools, 'ffuf_wordlist': ffuf_wordlist})
         with open(scan_log_file, 'w', encoding='utf-8') as f:
             json.dump(scan_log, f, ensure_ascii=False, indent=2)
+        
+        # Start scan threads
+        threads = []
+        for tool in selected_tools:
+            wordlist_path = ffuf_wordlist if tool == 'ffuf' else None
+            thread = threading.Thread(
+                target=run_scan_tool,
+                args=(tool, target_url, scan_folder_name, wordlist_path)
+            )
+            thread.start()
+            threads.append(thread)
+        
         return redirect(url_for('run_scans', scan_folder=scan_folder_name))
     return render_template('index.html', recent_scans=recent_scans)
 
-
-
 @app.route('/scan/<scan_folder>')
-def run_scans(scan_folder, tools=None):
-    # scan_folder ör: arama1_googlecom
-    output_base = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output')
-    scan_folder_path = os.path.join(output_base, scan_folder)
-    # scan_log.json'dan hedef ve araçları bul
-    import json
-    scan_log_file = os.path.join(output_base, 'scan_log.json')
-    decoded_target_url = None
-    selected_tools = []
-    if os.path.exists(scan_log_file):
-        with open(scan_log_file, 'r', encoding='utf-8') as f:
-            scan_log = json.load(f)
-        for entry in scan_log:
-            if entry['folder'] == scan_folder:
-                decoded_target_url = entry['target']
-                selected_tools = entry['tools']
-                break
-    if not decoded_target_url:
-        return redirect(url_for('index', error="Geçersiz tarama klasörü."))
-    # For Sublist3r, we need just the domain name.
-    from urllib.parse import urlparse
-    parsed_url = urlparse(decoded_target_url)
-    domain_for_sublist3r = parsed_url.netloc
-    if not domain_for_sublist3r:
-        domain_for_sublist3r = parsed_url.path.split('/')[0]
-    if not domain_for_sublist3r:
-        return redirect(url_for('index', error="Geçersiz hedef: Alan adı çıkarılamadı."))
-    log_file_base = scan_folder + "_"
-    # --- Sublist3r ---
-    if 'sublist3r' in selected_tools:
-        sublist3r_py_path = get_tool_path('Sublist3r/sublist3r')
-        sublist3r_command = ['python', sublist3r_py_path, '-d', domain_for_sublist3r]
-        run_command(sublist3r_command, os.path.join(scan_folder, "sublist3r_"), "sublist3r")
-    # --- SubDomainizer ---
-    if 'subdomainizer' in selected_tools:
-        subdomainizer_py_path = get_tool_path('SubDomainizer/SubDomainizer')
-        subdomainizer_command = ['python', subdomainizer_py_path, '-u', decoded_target_url]
-        run_command(subdomainizer_command, os.path.join(scan_folder, "subdomainizer_"), "subdomainizer")
-    # --- FFUF ---
-    if 'ffuf' in selected_tools:
-        ffuf_target_url = decoded_target_url
-        if not ffuf_target_url.endswith('/'):
-            ffuf_target_url += '/'
-        ffuf_target_url += 'FUZZ'
-        # Eğer kullanıcı özel bir wordlist girdiyse onu kullan, yoksa varsayılanı kullan
-        ffuf_wordlist_path = get_wordlist_path('common_small.txt')
-        if 'ffuf_wordlist' in entry and entry['ffuf_wordlist']:
-            ffuf_wordlist_path = entry['ffuf_wordlist']
-        ffuf_json_output_filename_base = scan_folder
-        ffuf_output_json_path = os.path.join(scan_folder_path, f"{ffuf_json_output_filename_base}_ffuf.json")
-        ffuf_command = [
-            'ffuf', '-u', ffuf_target_url, '-w', ffuf_wordlist_path,
-            '-o', ffuf_output_json_path, '-of', 'json',
-            '-c',
-            '-mc', '200,204,301,302,307,401,403,405,500'
-        ]
-        run_command(ffuf_command, os.path.join(scan_folder, "ffuf_"), "ffuf")
+def run_scans(scan_folder):
     return redirect(url_for('show_results', scan_folder=scan_folder))
 
-
+@app.route('/scan_status/<scan_folder>')
+def get_scan_status(scan_folder):
+    """API endpoint to get current scan status"""
+    if scan_folder in scan_statuses:
+        return jsonify(scan_statuses[scan_folder])
+    return jsonify({})
 
 @app.route('/results/<scan_folder>')
 def show_results(scan_folder):
@@ -352,8 +371,8 @@ def show_results(scan_folder):
                            ffuf_json_parsed=ffuf_json_content_parsed, 
                            ffuf_json_raw=ffuf_json_content_raw, 
                            ffuf_stderr=ffuf_stderr_content,
-                           tools_run=tools_run)
-
+                           tools_run=tools_run,
+                           scan_folder=scan_folder)
 
 if __name__ == '__main__':
     # Run the Flask development server

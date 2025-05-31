@@ -133,6 +133,10 @@
                        class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none placeholder-gray-500"
                        placeholder="varsayılan: wordlists/common_small.txt">
                 <p class="mt-1 text-xs text-gray-500">Eğer boş bırakılırsa 'wordlists/common_small.txt' kullanılır.</p>
+                <div id="ffuf-warning" class="hidden mt-2 p-2 bg-yellow-900/50 border border-yellow-700 rounded text-yellow-300 text-xs">
+                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                    <strong>Uyarı:</strong> Büyük kelime listeleri kullanırken tarama 30 dakikaya kadar sürebilir. Daha küçük kelime listeleri kullanmanız önerilir.
+                </div>
             </div>
 
             <div>
@@ -147,6 +151,27 @@
     <footer class="text-center text-gray-500 mt-10 pb-4">
         <p>&copy; 2025 Xnes. Tüm hakları saklıdır.</p>
         </footer>
+
+    <script>
+        // Add this script at the end of the body
+        document.addEventListener('DOMContentLoaded', function() {
+            const ffufCheckbox = document.getElementById('run_ffuf');
+            const ffufWarning = document.getElementById('ffuf-warning');
+            const wordlistInput = document.getElementById('wordlist');
+
+            function toggleWarning() {
+                if (ffufCheckbox.checked) {
+                    ffufWarning.classList.remove('hidden');
+                } else {
+                    ffufWarning.classList.add('hidden');
+                }
+            }
+
+            ffufCheckbox.addEventListener('change', toggleWarning);
+            // Initial check
+            toggleWarning();
+        });
+    </script>
 
 </body>
 </html>
