@@ -97,6 +97,40 @@ Projeyi Docker kullanarak da çalıştırabilirsiniz. Bu, bağımlılıkların v
 * `google.com`
 * `ffuf.io` (FFUF testleri için)
 
+## Komut Satırı (CLI) Kullanımı
+
+Web arayüzünü başlatmak yerine doğrudan terminalden tarama yapmak için `recon_wrappers.py` dosyasını çalıştırabilirsiniz. Böylece çıktı dosyaları `output/cli_<timestamp>_<hedef>` klasöründe saklanır.
+
+### Temel Kullanım
+```bash
+# Tüm araçları (Sublist3r, SubDomainizer, FFUF) çalıştırır
+python recon_wrappers.py -u https://hedef.com
+```
+
+### Araç Seçerek Çalıştırma
+```bash
+# Sadece Sublist3r ve SubDomainizer
+python recon_wrappers.py -u hedef.com -t sublist3r,subdomainizer
+```
+
+### FFUF için Özel Kelime Listesi
+```bash
+python recon_wrappers.py -u https://hedef.com -t ffuf -w wordlists/raft-medium-directories.txt
+```
+
+### Ardışık (Sıralı) Çalıştırma
+```bash
+python recon_wrappers.py -u hedef.com --sequential
+```
+
+### Parametre Referansı
+| Parametre | Açıklama | Varsayılan |
+|-----------|----------|-----------|
+| `-u, --target` | Hedef domain veya tam URL | Zorunlu |
+| `-t, --tools`  | Virgülle ayrılmış araç listesi `sublist3r, subdomainizer, ffuf` | Hepsi |
+| `-w, --wordlist` | FFUF için kelime listesi yolu | `wordlists/common_small.txt` |
+| `--sequential` | Araçları paralel yerine ardışık çalıştırır | Paralel |
+| `--verbose` | Araç çıktılarının ekrana yazdırılması | Kapalı |
 
 ## Ekran Görüntüleri
 
