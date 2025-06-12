@@ -1,0 +1,11 @@
+Process DNSdumpster-8:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.9/multiprocessing/process.py", line 315, in _bootstrap
+    self.run()
+  File "/app/tools/Sublist3r/sublist3r.py", line 268, in run
+    domain_list = self.enumerate()
+  File "/app/tools/Sublist3r/sublist3r.py", line 647, in enumerate
+    token = self.get_csrftoken(resp)
+  File "/app/tools/Sublist3r/sublist3r.py", line 641, in get_csrftoken
+    token = csrf_regex.findall(resp)[0]
+IndexError: list index out of range

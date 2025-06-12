@@ -1,0 +1,12 @@
+[
+  {
+    "folder": "arama1_googlecom",
+    "target": "https://google.com",
+    "tools": [
+      "sublist3r",
+      "subdomainizer",
+      "ffuf"
+    ],
+    "ffuf_wordlist": "/app/wordlists/common_small.txt"
+  }
+]

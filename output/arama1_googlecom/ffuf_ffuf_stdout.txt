@@ -1,0 +1,4 @@
+
+[2K[34mindex.html              [Status: 301, Size: 230, Words: 9, Lines: 7, Duration: 95ms][0m
+
+[2K[34mjs                      [Status: 301, Size: 222, Words: 9, Lines: 7, Duration: 98ms][0m

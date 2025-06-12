@@ -1,0 +1,44 @@
+
+      _____       _     _____                        _       _              
+     / ____|     | |   |  __ \                      (_)     (_)             
+    | (___  _   _| |__ | |  | | ___  _ __ ___   __ _ _ _ __  _ _______ _ __ 
+     \___ \| | | | '_ \| |  | |/ _ \| '_ ` _ \ / _` | | '_ \| |_  / _ \ '__|
+     ____) | |_| | |_) | |__| | (_) | | | | | | (_| | | | | | |/ /  __/ |   
+    |_____/ \__,_|_.__/|_____/ \___/|_| |_| |_|\__,_|_|_| |_|_/___\___|_|Version 2.1                                                                                                                                       
+Find interesting Subdomains and secrets hidden in page, folder, External Javascripts and GitHub 
+
+Searching for Inline Javascripts...
+Successfully got all the Inline Scripts.
+Searching for External Javascript links in page...
+Successfully got all the external js links.
+Finding secrets, cloud URLs, subdomains in all Javascript files...
+Searching completed...
+Got all the important, printing and/or saving...
+
+______________________Start of Results______________________
+____________________________________________________________
+
+Got some subdomains...
+Total Subdomains: 13
+google.com
+2fwww.google.com
+accounts.google.com
+ogads-pa.clients6.google.com
+uberproxy-pen-redirect.corp.google.com
+lens.google.com
+mail.google.com
+myaccount.google.com
+ogs.google.com
+play.google.com
+policies.google.com
+support.google.com
+www.google.com
+____________________________________________________________
+
+Found some secrets(might be false positive)...
+Total Possible Secrets: 2
+password=e.password | https://www.gstatic.com/og/_/js/k=og.asy.en_US.IGxan5F1-y8.2019.O/rt=j/m=_ac,_awd,ada,lldp,qads,abld/exm=/d=1/ed=1/rs=AA2YrTsOxXs2LYQi73cYakneKzvIctlTiA
+-Api-Key":"AIzaSyCbsbvGCe7C9mCtdaTycZB2eUFuzsYKG_E" | https://www.gstatic.com/og/_/js/k=og.asy.en_US.IGxan5F1-y8.2019.O/rt=j/m=_ac,_awd,ada,lldp,qads,abld/exm=/d=1/ed=1/rs=AA2YrTsOxXs2LYQi73cYakneKzvIctlTiA
+
+_______________________End of Results_______________________
+

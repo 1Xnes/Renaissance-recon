@@ -141,45 +141,18 @@ python recon_wrappers.py -u hedef.com --sequential
 
 ## Ekran Görüntüleri
 
-*(Buraya web arayüzünün ana sayfasının, sonuçlar sayfasının ve AI chat sayfasının ekran görüntüleri eklenecek)*
 
-*   **Ana Sayfa (Tarama Başlatma):**
-    `[SCREENSHOT_MAIN_PAGE_HERE]`
 
 *   **Sonuçlar Sayfası (Örnek Bir Tarama):**
-    `[SCREENSHOT_RESULTS_PAGE_HERE]`
+    ![Sonuçlar Sayfası](poc_images/gui_1.jpg)
 
-*   **FFUF ile Bulunan JS Dosyaları Bölümü:**
-    `[SCREENSHOT_JS_FILES_SECTION_HERE]`
-
-*   **JS İçerik Görüntüleme Modalı:**
-    `[SCREENSHOT_JS_MODAL_HERE]`
 
 *   **AI Chat Sayfası:**
-    `[SCREENSHOT_AI_CHAT_PAGE_HERE]`
+    ![AI Chat Sayfası](poc_images/gui_2.jpg)
 
-*   **Örnek Terminal Çıktısı (Uygulama Başlatma ve Tarama Akışı):**
-    ```
-    (venv) $ python app.py
-     * Serving Flask app 'app'
-     * Debug mode: on
-    WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
-     * Running on http://127.0.0.1:5000
-    Press CTRL+C to quit
-     * Restarting with stat
-     * Debugger is active!
-     * Debugger PIN: XXX-XXX-XXX
-    [12:34:56] arama1_testphpvulnwebcom - sublist3r: Başlatılıyor...
-    [12:34:56] arama1_testphpvulnwebcom - ffuf: Başlatılıyor...
-    [12:34:56] arama1_testphpvulnwebcom - subdomainizer: Başlatılıyor...
-    [12:34:57] arama1_testphpvulnwebcom - sublist3r: Çalışıyor...
-    [12:34:57] arama1_testphpvulnwebcom - subdomainizer: Çalışıyor...
-    [12:34:58] arama1_testphpvulnwebcom - ffuf: Çalışıyor...
-    ... (tarama çıktıları) ...
-    [12:35:10] arama1_testphpvulnwebcom - sublist3r: Tamamlandı
-    [12:35:15] arama1_testphpvulnwebcom - subdomainizer: Tamamlandı
-    [12:36:00] arama1_testphpvulnwebcom - ffuf: Tamamlandı
-    ```
+
+*   **CLI Çıktısı (Terminal):**
+    ![CLI Çıktısı](poc_images/cli_output.jpg)
 
 ## Katkıda Bulunma
 
@@ -206,4 +179,4 @@ Bu araç geliştirilirken aşağıdaki açık kaynaklı projelere ve kütüphane
 *   **[Marked](https://marked.js.org/):** AI Chat arayüzünde Markdown metinlerini HTML'e dönüştürmek için.
 
 
-Bu araç, sızma testi ve güvenlik araştırmaları sırasında bilgi toplama süreçlerini otomatize etmek ve kolaylaştırmak amacıyla geliştirilmiştir. Lütfen aracı yasal ve etik kurallar çerçevesinde kullanın.
+Bu araç, sızma testi ve güvenlik araştırmaları sırasında bilgi toplama süreçlerini otomatize etmek ve kolaylaştırmak amacıyla geliştirilmiştir. Aracı yasal ve etik kurallar çerçevesinde kullanın. 
