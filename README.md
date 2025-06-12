@@ -39,6 +39,32 @@ Python 3.9 veya üzeri bir sürüm gereklidir.
     GEMINI_API_KEY='YOUR_API_KEY_HERE'
     ```
 
+
+## Kullanım
+
+1.  **Uygulamayı Başlatın:**
+    Proje ana dizinindeyken aşağıdaki komutu çalıştırın:
+    ```bash
+    python app.py
+    ```
+
+2.  **Web Arayüzüne Erişin:**
+    Uygulama başlatıldıktan sonra web tarayıcınızda `http://127.0.0.1:5000` adresine gidin.
+
+3.  **Tarama Başlatma:**
+    *   "Hedef Domain/URL" alanına taramak istediğiniz domaini (örn: `example.com`) veya URL'yi (örn: `https://example.com`) girin.
+    *   Çalıştırmak istediğiniz araçları (Sublist3r, SubDomainizer, FFUF) seçin.
+    *   FFUF için opsiyonel olarak özel bir kelime listesi (`wordlist`) yolu belirtebilirsiniz. Boş bırakılırsa `wordlists/common_small.txt` kullanılır.
+    *   "Taramayı Başlat" butonuna tıklayın.
+
+4.  **Sonuçları Görüntüleme:**
+    Tarama tamamlandıktan sonra veya devam ederken sonuçlar web arayüzünde ilgili sekmelerde (Sublist3r, SubDomainizer, FFUF, FFUF ile Bulunan JS Dosyaları) görüntülenecektir.
+    *   Her bir aracın ham çıktısını ve ayrıştırılmış/önemli sonuçlarını görebilirsiniz.
+    *   FFUF ile bulunan JS dosyalarının listesini ve üzerine tıklayarak içeriklerini inceleyebilirsiniz.
+    *   Sonuçları ayrı ayrı veya tümünü bir `.zip` dosyası olarak indirebilirsiniz.
+    *   Eğer Gemini API anahtarı tanımlıysa, "AI ile Tartış" butonu ile sonuçları AI'a gönderip analiz ve öneriler alabilirsiniz.
+
+
 ## Docker ile Çalıştırma (Opsiyonel)
 
 Projeyi Docker kullanarak da çalıştırabilirsiniz. Bu, bağımlılıkların ve araçların kurulumuyla uğraşmanızı engeller.
@@ -67,29 +93,10 @@ Projeyi Docker kullanarak da çalıştırabilirsiniz. Bu, bağımlılıkların v
 3.  **Web Arayüzüne Erişin:**
     Container başlatıldıktan sonra web tarayıcınızda `http://127.0.0.1:5000` adresine gidin.
 
-## Kullanım
 
-1.  **Uygulamayı Başlatın:**
-    Proje ana dizinindeyken aşağıdaki komutu çalıştırın:
-    ```bash
-    python app.py
-    ```
 
-2.  **Web Arayüzüne Erişin:**
-    Uygulama başlatıldıktan sonra web tarayıcınızda `http://127.0.0.1:5000` adresine gidin.
 
-3.  **Tarama Başlatma:**
-    *   "Hedef Domain/URL" alanına taramak istediğiniz domaini (örn: `example.com`) veya URL'yi (örn: `https://example.com`) girin.
-    *   Çalıştırmak istediğiniz araçları (Sublist3r, SubDomainizer, FFUF) seçin.
-    *   FFUF için opsiyonel olarak özel bir kelime listesi (`wordlist`) yolu belirtebilirsiniz. Boş bırakılırsa `wordlists/common_small.txt` kullanılır.
-    *   "Taramayı Başlat" butonuna tıklayın.
 
-4.  **Sonuçları Görüntüleme:**
-    Tarama tamamlandıktan sonra veya devam ederken sonuçlar web arayüzünde ilgili sekmelerde (Sublist3r, SubDomainizer, FFUF, FFUF ile Bulunan JS Dosyaları) görüntülenecektir.
-    *   Her bir aracın ham çıktısını ve ayrıştırılmış/önemli sonuçlarını görebilirsiniz.
-    *   FFUF ile bulunan JS dosyalarının listesini ve üzerine tıklayarak içeriklerini inceleyebilirsiniz.
-    *   Sonuçları ayrı ayrı veya tümünü bir `.zip` dosyası olarak indirebilirsiniz.
-    *   Eğer Gemini API anahtarı tanımlıysa, "AI ile Tartış" butonu ile sonuçları AI'a gönderip analiz ve öneriler alabilirsiniz.
 
 ### Test Edilebilecek Örnek Hedefler:
 * `testphp.vulnweb.com`
